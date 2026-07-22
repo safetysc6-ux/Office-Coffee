@@ -509,6 +509,7 @@
         let adminPin = '1234';
         let pendingAdminAction = null;
         let orderQuantity = 1;
+        let currentTab = 'kiosk';
 
         // Supabase State
         let supabaseUrl = 'https://cnajtuadqsawrjpoedig.supabase.co'; 
@@ -566,9 +567,7 @@
 
             if (users.length === 0) {
                 users = [
-                    { id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true },
-                    { id: 'u_1', name: 'คุณสมชาย', pin: '1234', dept: 'IT', debt: 0, totalCups: 0, isAdmin: false },
-                    { id: 'u_2', name: 'คุณอนันต์', pin: '1234', dept: 'HR', debt: 0, totalCups: 0, isAdmin: false }
+                    { id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true }
                 ];
                 saveLocalData();
             }
@@ -647,20 +646,22 @@
         function renderUI() {
             const viewLogin = document.getElementById('view-login');
             const viewKiosk = document.getElementById('view-kiosk');
+            const viewDash = document.getElementById('view-dashboard');
             const navTabs = document.getElementById('nav-tabs');
+            const btnKiosk = document.getElementById('tab-btn-kiosk');
+            const btnDash = document.getElementById('tab-btn-dashboard');
             const currentUser = users.find(u => u.id === activeUserId);
 
             if (!currentUser) {
                 viewLogin.classList.remove('hidden');
                 viewKiosk.classList.add('hidden');
-                document.getElementById('view-dashboard').classList.add('hidden');
+                viewDash.classList.add('hidden');
                 navTabs.classList.add('hidden');
                 document.getElementById('header-user-name').innerText = 'เข้าสู่ระบบ';
                 document.getElementById('btn-settings').classList.add('hidden');
                 renderLoginUserList();
             } else {
                 viewLogin.classList.add('hidden');
-                viewKiosk.classList.remove('hidden');
                 navTabs.classList.remove('hidden');
 
                 document.getElementById('header-user-name').innerText = currentUser.name;
@@ -677,72 +678,26 @@
                 if (userDebt > 0) btnPayDebt.classList.remove('hidden');
                 else btnPayDebt.classList.add('hidden');
 
-                updateQuantityUI();
-                renderLogs();
-            }
-        }
-
-        function renderLoginUserList() {
-            const container = document.getElementById('login-user-list');
-            if (!container) return;
-            container.innerHTML = '';
-
-            users.forEach(u => {
-                const userDebt = calculateUserDebt(u.id);
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.onclick = () => openLoginModal(u.id);
-                btn.className = "w-full text-left p-3 rounded-2xl bg-stone-50 hover:bg-stone-100 border border-stone-200 transition flex items-center justify-between";
-                btn.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-full ${u.isAdmin ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-700'} font-bold flex items-center justify-center text-sm shadow-inner">
-                            ${u.isAdmin ? '👑' : '☕'}
-                        </div>
-                        <div>
-                            <span class="font-bold text-stone-800 text-sm">${u.name}</span>
-                            <span class="text-[10px] bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded ml-1.5">${u.dept || 'ทั่วไป'}</span>
-                            <span class="text-[10px] text-stone-400 block mt-0.5">กดแล้ว ${(u.totalCups || 0)} แก้ว</span>
-                        </div>
-                    </div>
-                    <span class="text-xs font-bold ${userDebt > 0 ? 'text-red-600' : 'text-emerald-600'}">
-                        ${userDebt > 0 ? `ค้าง ${userDebt}฿` : 'พร้อมกด'}
-                    </span>
-                `;
-                container.appendChild(btn);
-            });
-        }
-
-        function openLoginModal(userId) {
-            const targetUser = users.find(u => u.id === userId);
-            if (!targetUser) return;
-
-            pendingLoginUserId = userId;
-            document.getElementById('login-modal-user-name').innerText = `เข้าสู่ระบบ: ${targetUser.name}`;
-            document.getElementById('input-user-pin').value = '';
-            document.getElementById('user-pin-modal').classList.remove('hidden');
-        }
-
-        function confirmLogin(e) {
-            e.preventDefault();
-            const inputPin = document.getElementById('input-user-pin').value.trim();
-            const targetUser = users.find(u => u.id === pendingLoginUserId);
-
-            if (targetUser) {
-                const userPin = targetUser.pin || '1234';
-                if (inputPin === userPin || (targetUser.isAdmin && inputPin === adminPin)) {
-                    activeUserId = targetUser.id;
-                    saveLocalData();
-                    closeModal('user-pin-modal');
-                    renderUI();
-                    showToast(`ยินดีต้อนรับ ${targetUser.name}`);
+                if (currentTab === 'kiosk') {
+                    viewKiosk.classList.remove('hidden');
+                    viewDash.classList.add('hidden');
+                    btnKiosk.className = "flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-900 bg-amber-400 shadow transition flex items-center justify-center gap-1.5";
+                    btnDash.className = "flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition flex items-center justify-center gap-1.5";
+                    updateQuantityUI();
+                    renderLogs();
                 } else {
-                    showToast('รหัส PIN ไม่ถูกต้อง!');
+                    viewDash.classList.remove('hidden');
+                    viewKiosk.classList.add('hidden');
+                    btnDash.className = "flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-900 bg-amber-400 shadow transition flex items-center justify-center gap-1.5";
+                    btnKiosk.className = "flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition flex items-center justify-center gap-1.5";
+                    renderDashboard();
                 }
             }
         }
 
         function logoutToUserSelection() {
             activeUserId = null;
+            currentTab = 'kiosk';
             saveLocalData();
             renderUI();
             showToast('ออกจากระบบเรียบร้อย');
@@ -1211,23 +1166,8 @@
         }
 
         function switchTab(tab) {
-            const kioskView = document.getElementById('view-kiosk');
-            const dashView = document.getElementById('view-dashboard');
-            const btnKiosk = document.getElementById('tab-btn-kiosk');
-            const btnDash = document.getElementById('tab-btn-dashboard');
-
-            if (tab === 'kiosk') {
-                kioskView.classList.remove('hidden');
-                dashView.classList.add('hidden');
-                btnKiosk.className = "flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-900 bg-amber-400 shadow transition flex items-center justify-center gap-1.5";
-                btnDash.className = "flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition flex items-center justify-center gap-1.5";
-            } else {
-                dashView.classList.remove('hidden');
-                kioskView.classList.add('hidden');
-                btnDash.className = "flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-900 bg-amber-400 shadow transition flex items-center justify-center gap-1.5";
-                btnKiosk.className = "flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition flex items-center justify-center gap-1.5";
-                renderDashboard();
-            }
+            currentTab = tab;
+            renderUI();
         }
 
         function renderDashboard() {
