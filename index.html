@@ -536,20 +536,28 @@
                 // Fetch Users
                 const { data: dbUsers, error: uErr } = await supabaseClient.from('users').select('*');
                 if (!uErr && dbUsers && dbUsers.length > 0) {
-                    users = dbUsers.map(u => ({
-                        id: u.id,
-                        name: u.name,
-                        pin: u.pin || '1234',
-                        dept: u.dept || 'ทั่วไป',
-                        debt: u.debt || 0,
-                        totalCups: u.total_cups || 0,
-                        isAdmin: !!u.is_admin
-                    }));
+                    const dbUserIds = new Set(dbUsers.map(u => u.id));
+                    const mappedDbUsers = dbUsers.map(u => {
+                        const localMatch = users.find(lu => lu.id === u.id);
+                        return {
+                            id: u.id,
+                            name: u.name,
+                            pin: u.pin || (localMatch ? localMatch.pin : '1234'),
+                            dept: u.dept || 'ทั่วไป',
+                            debt: u.debt || 0,
+                            totalCups: u.total_cups || 0,
+                            isAdmin: !!u.is_admin
+                        };
+                    });
+
+                    // Preserve newly created local users not yet synced
+                    const localOnlyUsers = users.filter(lu => !dbUserIds.has(lu.id));
+                    users = [...mappedDbUsers, ...localOnlyUsers];
                 } else if (dbUsers && dbUsers.length === 0) {
                     // Seed initial admin if database is empty
                     const defaultAdmin = { id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true };
                     users = [defaultAdmin];
-                    await supabaseClient.from('users').insert([{
+                    let adminPayload = {
                         id: defaultAdmin.id,
                         name: defaultAdmin.name,
                         pin: defaultAdmin.pin,
@@ -557,7 +565,12 @@
                         debt: 0,
                         total_cups: 0,
                         is_admin: true
-                    }]);
+                    };
+                    const { error: seedErr } = await supabaseClient.from('users').insert([adminPayload]);
+                    if (seedErr) {
+                        delete adminPayload.pin;
+                        await supabaseClient.from('users').insert([adminPayload]);
+                    }
                 }
 
                 // Ensure admin exists locally
@@ -782,10 +795,10 @@
 
             saveLocalData();
 
-            // Insert into Supabase DB
+            // Insert into Supabase DB with Fallback for missing 'pin' column
             if (isSupabaseActive && supabaseClient) {
                 try {
-                    await supabaseClient.from('users').insert([{
+                    let payload = {
                         id: newUser.id,
                         name: newUser.name,
                         pin: newUser.pin,
@@ -793,7 +806,16 @@
                         debt: 0,
                         total_cups: 0,
                         is_admin: false
-                    }]);
+                    };
+                    const { error } = await supabaseClient.from('users').insert([payload]);
+                    if (error) {
+                        console.warn("Supabase insert user with pin failed, retrying without pin column:", error);
+                        delete payload.pin;
+                        const { error: err2 } = await supabaseClient.from('users').insert([payload]);
+                        if (err2) {
+                            console.error("Supabase insert user fallback failed:", err2);
+                        }
+                    }
                 } catch(err) {
                     console.error("Supabase insert user error", err);
                 }
