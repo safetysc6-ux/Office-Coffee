@@ -316,7 +316,7 @@
 
             <div class="bg-promptpay-blue text-white py-2.5 px-4 rounded-xl flex justify-center items-center gap-2 mb-3">
                 <span class="font-bold tracking-wider text-base">Prompt Pay</span>
-                <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded">พร้อมเพย์ 10 บาท</span>
+                <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded">พร้อมเพย์</span>
             </div>
 
             <p class="text-xs text-stone-500">สแกนจ่ายเงินโอนเพื่อเริ่มชงกาแฟสด</p>
@@ -574,6 +574,7 @@
                         userName: l.user_name,
                         method: l.method,
                         amount: l.amount,
+                        cups: l.cups || 1,
                         time: l.time_str
                     }));
                 }
@@ -585,6 +586,7 @@
                         id: d.id,
                         userId: d.user_id,
                         amount: d.amount,
+                        cups: d.cups || Math.round(d.amount / 10),
                         paid: d.paid,
                         timeStr: d.time_str
                     }));
@@ -1095,195 +1097,6 @@
             renderUI();
             showToast(`เคลียร์ยอดติดไว้ ${totalClearedAmount} บาท เรียบร้อยแล้ว`);
         }
-        }
-
-        async function confirmOrderSuccess(method) {
-            const currentUser = users.find(u => u.id === activeUserId);
-            if (!currentUser) return;
-
-            const nowStr = new Date().toLocaleString('th-TH', { hour12: false });
-            const newLog = {
-                id: 'log_' + Date.now(),
-                userId: currentUser.id,
-                userName: currentUser.name,
-                method: method,
-                amount: 10,
-                time: nowStr
-            };
-
-            logs.unshift(newLog);
-            currentUser.totalCups = (currentUser.totalCups || 0) + 1;
-
-            let newDebt = null;
-            if (method === 'debt') {
-                newDebt = {
-                    id: 'd_' + Date.now(),
-                    userId: currentUser.id,
-                    amount: 10,
-                    paid: false,
-                    timeStr: nowStr
-                };
-                debtItems.push(newDebt);
-            }
-
-            saveLocalData();
-
-            // Insert to Supabase DB
-            if (isSupabaseActive && supabaseClient) {
-                try {
-                    await supabaseClient.from('coffee_logs').insert([{
-                        id: newLog.id,
-                        user_id: newLog.userId,
-                        user_name: newLog.userName,
-                        method: newLog.method,
-                        amount: 10,
-                        time_str: newLog.time
-                    }]);
-
-                    await supabaseClient.from('users').update({ total_cups: currentUser.totalCups }).eq('id', currentUser.id);
-
-                    if (newDebt) {
-                        await supabaseClient.from('debts').insert([{
-                            id: newDebt.id,
-                            user_id: newDebt.userId,
-                            amount: 10,
-                            paid: false,
-                            time_str: newDebt.timeStr
-                        }]);
-                    }
-                } catch(err) {
-                    console.error("Supabase order sync error", err);
-                }
-            }
-
-            closeModal('qr-modal');
-            renderUI();
-            startDispensingAnimation();
-        }
-
-        function startDispensingAnimation() {
-            const dispenseModal = document.getElementById('dispense-modal');
-            const progressBar = document.getElementById('dispense-progress');
-            const statusText = document.getElementById('dispense-status-text');
-
-            dispenseModal.classList.remove('hidden');
-            progressBar.style.width = '0%';
-            statusText.innerText = 'กำลังเริ่มบดเมล็ดกาแฟสด...';
-
-            setTimeout(() => {
-                progressBar.style.width = '40%';
-                statusText.innerText = 'กำลังทำความร้อนและสกัดกาแฟ...';
-            }, 1000);
-
-            setTimeout(() => {
-                progressBar.style.width = '80%';
-                statusText.innerText = 'กำลังเทกาแฟลงในแก้ว...';
-            }, 2300);
-
-            setTimeout(() => {
-                progressBar.style.width = '100%';
-                statusText.innerText = 'เสร็จเรียบร้อย! เชิญรับกาแฟสดได้เลยครับ';
-            }, 3500);
-
-            setTimeout(() => {
-                dispenseModal.classList.add('hidden');
-                showToast('ชงกาแฟสดเสร็จสิ้น ขอให้มีความสุขกับการทำงานครับ! ☕');
-            }, 4300);
-        }
-
-        function openSettleDebtModal() {
-            const currentUser = users.find(u => u.id === activeUserId);
-            if (!currentUser) return;
-
-            const userUnpaidDebts = debtItems.filter(d => d.userId === currentUser.id && !d.paid);
-            const listContainer = document.getElementById('settle-items-list');
-            listContainer.innerHTML = '';
-
-            if (userUnpaidDebts.length === 0) {
-                listContainer.innerHTML = `<p class="text-xs text-stone-400 text-center py-4">ไม่มีรายการติดค้างชำระ</p>`;
-                document.getElementById('settle-amount').innerText = '0 บาท';
-                document.getElementById('btn-confirm-settle').disabled = true;
-                document.getElementById('settle-modal').classList.remove('hidden');
-                return;
-            }
-
-            userUnpaidDebts.forEach((debt) => {
-                const div = document.createElement('div');
-                div.className = "py-2 px-1 flex items-center justify-between text-xs";
-                div.innerHTML = `
-                    <label class="flex items-center gap-2.5 cursor-pointer flex-1">
-                        <input type="checkbox" value="${debt.id}" onchange="updateSettleTotal()" class="debt-item-checkbox w-4 h-4 rounded text-amber-600 focus:ring-amber-500">
-                        <div>
-                            <span class="font-bold text-stone-800">กาแฟสด 10.-</span>
-                            <span class="text-[10px] text-stone-400 block">${debt.timeStr}</span>
-                        </div>
-                    </label>
-                    <span class="font-bold text-amber-900">10 บาท</span>
-                `;
-                listContainer.appendChild(div);
-            });
-
-            document.getElementById('select-all-debts').checked = false;
-            updateSettleTotal();
-            document.getElementById('settle-modal').classList.remove('hidden');
-        }
-
-        function toggleSelectAllDebts(masterCheckbox) {
-            const checkboxes = document.querySelectorAll('.debt-item-checkbox');
-            checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
-            updateSettleTotal();
-        }
-
-        function updateSettleTotal() {
-            const checkboxes = document.querySelectorAll('.debt-item-checkbox:checked');
-            const totalAmount = checkboxes.length * 10;
-
-            document.getElementById('settle-selected-count').innerText = `เลือก ${checkboxes.length} รายการ`;
-            document.getElementById('settle-amount').innerText = `${totalAmount} บาท`;
-
-            const btnConfirm = document.getElementById('btn-confirm-settle');
-            const qrContainer = document.getElementById('settle-qr-container');
-
-            if (totalAmount > 0) {
-                btnConfirm.disabled = false;
-                qrContainer.classList.remove('hidden');
-                const qrUrl = generatePromptPayQR(promptPayId, totalAmount);
-                document.getElementById('settle-qr-image').src = qrUrl;
-            } else {
-                btnConfirm.disabled = true;
-                qrContainer.classList.add('hidden');
-            }
-        }
-
-        async function confirmSettleDebt() {
-            const checkboxes = document.querySelectorAll('.debt-item-checkbox:checked');
-            if (checkboxes.length === 0) return;
-
-            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
-
-            debtItems.forEach(d => {
-                if (selectedIds.includes(d.id)) {
-                    d.paid = true;
-                }
-            });
-
-            saveLocalData();
-
-            // Sync paid status to Supabase
-            if (isSupabaseActive && supabaseClient) {
-                try {
-                    for (const id of selectedIds) {
-                        await supabaseClient.from('debts').update({ paid: true }).eq('id', id);
-                    }
-                } catch(err) {
-                    console.error("Supabase settle debt error", err);
-                }
-            }
-
-            closeModal('settle-modal');
-            renderUI();
-            showToast(`เคลียร์ยอดติดไว้ ${selectedIds.length * 10} บาท เรียบร้อยแล้ว`);
-        }
 
         function openPromptPayConfigModal() {
             const currentUser = users.find(u => u.id === activeUserId);
@@ -1399,8 +1212,8 @@
         }
 
         function renderDashboard() {
-            const totalCups = logs.length;
-            const totalRevenue = totalCups * 10;
+            const totalRevenue = logs.reduce((sum, l) => sum + (l.amount || 10), 0);
+            const totalCups = logs.reduce((sum, l) => sum + (l.cups || Math.round((l.amount || 10) / 10)), 0);
             const totalUnpaidDebt = debtItems.filter(d => !d.paid).reduce((sum, d) => sum + d.amount, 0);
             const totalPaid = totalRevenue - totalUnpaidDebt;
 
