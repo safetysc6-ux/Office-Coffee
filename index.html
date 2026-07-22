@@ -73,19 +73,21 @@
 
             <!-- Header Action Buttons -->
             <div class="flex items-center gap-1.5">
-                <button id="btn-settings" onclick="openPromptPayConfigModal()" title="ตั้งค่า PromptPay (เฉพาะ Admin)" class="hidden bg-stone-800 hover:bg-stone-700 text-amber-400 p-1.5 rounded-xl border border-stone-700 transition">
+                <button id="btn-settings" onclick="openPromptPayConfigModal()" title="ตั้งค่า PromptPay และผู้ใช้ (เฉพาะ Admin)" class="hidden bg-stone-800 hover:bg-stone-700 text-amber-400 p-1.5 rounded-xl border border-stone-700 transition">
                     <i class="fa-solid fa-gear text-xs"></i>
                 </button>
-                <button onclick="openUserModal()" class="bg-stone-800 hover:bg-stone-700 border border-stone-700 px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5 text-xs font-medium">
-                    <i class="fa-solid fa-user-circle text-amber-400 text-xs"></i>
-                    <span id="header-user-name" class="max-w-[70px] truncate">ผู้ใช้</span>
-                    <i class="fa-solid fa-chevron-down text-[9px] text-stone-400"></i>
-                </button>
+                <div id="header-user-section" class="hidden">
+                    <button onclick="logoutUser()" class="bg-stone-800 hover:bg-red-950/80 text-stone-200 border border-stone-700 hover:border-red-800/80 px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5 text-xs font-medium">
+                        <i class="fa-solid fa-user-check text-amber-400 text-xs"></i>
+                        <span id="header-user-name" class="max-w-[80px] truncate">ผู้ใช้</span>
+                        <i class="fa-solid fa-right-from-bracket text-[10px] text-red-400 ml-1" title="ออกจากระบบ"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Navigation Tabs: Kiosk vs Dashboard -->
-        <div class="max-w-md mx-auto px-4 pb-2 flex gap-2 border-t border-stone-800/80 pt-2">
+        <!-- Navigation Tabs: Kiosk vs Dashboard (Shown only when logged in) -->
+        <div id="nav-tabs" class="hidden max-w-md mx-auto px-4 pb-2 flex gap-2 border-t border-stone-800/80 pt-2">
             <button id="tab-btn-kiosk" onclick="switchTab('kiosk')" class="flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-900 bg-amber-400 shadow transition flex items-center justify-center gap-1.5">
                 <i class="fa-solid fa-mug-saucer"></i> หน้าตู้ชงกาแฟ
             </button>
@@ -98,8 +100,36 @@
     <!-- Main Content Container -->
     <main class="max-w-md mx-auto w-full px-4 py-4 flex-grow">
 
-        <!-- VIEW 1: KIOSK INTERFACE -->
-        <div id="view-kiosk" class="space-y-4">
+        <!-- VIEW 0: LOGIN & USER SELECTION VIEW (DEFAULT FIRST PAGE) -->
+        <div id="view-login" class="space-y-4">
+            <div class="bg-stone-900 rounded-3xl p-6 text-white text-center shadow-xl border border-stone-800">
+                <div class="w-20 h-20 mx-auto rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-400 text-4xl mb-3 border border-amber-500/30">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                </div>
+                <h2 class="text-xl font-extrabold text-amber-100">เข้าสู่ระบบตู้กาแฟสด</h2>
+                <p class="text-xs text-stone-400 mt-1">เลือกชื่อผู้ใช้เพื่อเข้าสู่ระบบชงกาแฟ (10.-)</p>
+            </div>
+
+            <!-- Existing Users List Grid -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200">
+                <h3 class="font-bold text-stone-800 text-xs uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-users text-amber-700 mr-1.5"></i>เลือกรายชื่อพนักงาน</span>
+                </h3>
+
+                <div id="login-user-list" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    <!-- Dynamic User List Buttons -->
+                </div>
+            </div>
+
+            <!-- Register New User Button -->
+            <button onclick="openRegisterModal()" class="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2.5 text-sm">
+                <i class="fa-solid fa-user-plus text-base"></i>
+                <span>สมัครสมาชิกพนักงานใหม่</span>
+            </button>
+        </div>
+
+        <!-- VIEW 1: KIOSK INTERFACE (Shown after login) -->
+        <div id="view-kiosk" class="hidden space-y-4">
             <!-- Active User Info Bar -->
             <div id="user-info-card" class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -108,7 +138,7 @@
                     </div>
                     <div>
                         <div class="flex items-center gap-2">
-                            <h2 id="current-user-name" class="font-bold text-stone-800 text-base">กรุณาลงชื่อผู้ใช้</h2>
+                            <h2 id="current-user-name" class="font-bold text-stone-800 text-base">ผู้ใช้</h2>
                             <span id="user-dept-badge" class="bg-stone-100 text-stone-600 text-[10px] px-2 py-0.5 rounded-md font-medium">ทั่วไป</span>
                         </div>
                         <p class="text-xs text-stone-500 mt-0.5">ยอดติดไว้สะสม: <span id="current-user-debt" class="font-bold text-red-600">0 บาท</span></p>
@@ -121,7 +151,6 @@
 
             <!-- Single Fresh Coffee Card -->
             <div class="bg-gradient-to-b from-stone-900 to-amber-950 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden border border-stone-800 text-center">
-                
                 <!-- Price Badge -->
                 <div class="absolute top-4 right-4 bg-amber-500 text-stone-900 font-black text-lg px-3.5 py-1 rounded-full shadow-lg">
                     10.-
@@ -230,19 +259,37 @@
                     <!-- Dynamic Leaderboard -->
                 </div>
             </div>
-
-            <!-- Department Summary -->
-            <div class="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm">
-                <h3 class="font-bold text-xs text-stone-700 uppercase tracking-wider mb-3 flex items-center justify-between">
-                    <span><i class="fa-solid fa-sitemap text-amber-700 mr-1.5"></i> สรุปการใช้บริการตามแผนก</span>
-                </h3>
-                <div id="dash-dept-summary" class="space-y-2 text-xs">
-                    <!-- Dynamic Dept Stats -->
-                </div>
-            </div>
         </div>
 
     </main>
+
+    <!-- REGISTER NEW USER MODAL -->
+    <div id="register-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl text-center relative">
+            <button onclick="closeModal('register-modal')" class="absolute top-4 right-4 w-7 h-7 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 flex items-center justify-center">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+            <div class="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
+                <i class="fa-solid fa-user-plus"></i>
+            </div>
+            <h3 class="font-bold text-stone-800 text-base mb-1">สมัครสมาชิกพนักงานใหม่</h3>
+            <p class="text-xs text-stone-500 mb-4">กรอกข้อมูลเพื่อสร้างบัญชีเข้าใช้งานตู้กาแฟสด</p>
+            
+            <form onsubmit="registerUser(event)" class="space-y-3 text-left">
+                <div>
+                    <label class="block text-xs font-semibold text-stone-600 mb-1">ชื่อผู้ใช้ / ชื่อเล่น</label>
+                    <input type="text" id="reg-name" placeholder="เช่น คุณสมชาย (IT)" required class="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-stone-600 mb-1">ตั้งรหัสผ่าน / PIN (4-6 หลัก)</label>
+                    <input type="password" id="reg-pin" placeholder="กรอก PIN 4-6 หลัก" required maxlength="6" class="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs transition shadow flex items-center justify-center gap-1.5 mt-2">
+                    <i class="fa-solid fa-check"></i> ยืนยันสมัครสมาชิก
+                </button>
+            </form>
+        </div>
+    </div>
 
     <!-- PROMPTPAY QR MODAL -->
     <div id="qr-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
@@ -320,89 +367,46 @@
         </div>
     </div>
 
-    <!-- PROMPTPAY SETTINGS MODAL (ADMIN) -->
+    <!-- PROMPTPAY & USER ADMIN SETTINGS MODAL (ADMIN ONLY) -->
     <div id="promptpay-config-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl text-center relative">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl text-center relative max-h-[90vh] flex flex-col">
             <button onclick="closeModal('promptpay-config-modal')" class="absolute top-4 right-4 w-7 h-7 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 flex items-center justify-center">
                 <i class="fa-solid fa-xmark text-xs"></i>
             </button>
 
             <h3 class="font-bold text-stone-800 text-base mb-1 flex items-center justify-center gap-2">
-                <i class="fa-solid fa-qrcode text-promptpay-blue"></i> ตั้งค่า PromptPay รับเงิน (Admin)
+                <i class="fa-solid fa-gear text-amber-600"></i> ตั้งค่าระบบและสมาชิก (Admin)
             </h3>
-            <p class="text-xs text-stone-500 mb-4">ใส่เบอร์โทรศัพท์ หรือเลขประจำตัวผู้เสียภาษี/บัตรประชาชน เพื่อสร้าง QR Code พร้อมเพย์จริง</p>
+            <p class="text-xs text-stone-500 mb-3">จัดการข้อมูล PromptPay และจัดการสมาชิกพนักงาน</p>
 
-            <div class="space-y-3 text-left">
-                <div>
-                    <label class="block text-xs font-bold text-stone-600 mb-1">หมายเลข พร้อมเพย์ (PromptPay ID)</label>
-                    <input type="text" id="input-promptpay-id" placeholder="เช่น 0812345678 หรือ 1100123456789" class="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
-                    <p class="text-[10px] text-stone-400 mt-1">* รองรับเบอร์โทรศัพท์ (10 หลัก) หรือ เลขบัตรประชาชน/ผู้เสียภาษี (13 หลัก)</p>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-stone-600 mb-1">เปลี่ยนรหัส PIN Admin</label>
-                    <input type="password" id="input-admin-new-pin" placeholder="รหัส PIN ใหม่ (4-6 หลัก)" class="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
-                </div>
-
-                <button onclick="savePromptPayConfig()" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-2.5 rounded-xl text-xs transition">
-                    บันทึกข้อมูลตั้งค่า
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ADMIN PIN VERIFICATION MODAL -->
-    <div id="admin-pin-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-xs w-full p-5 shadow-2xl text-center relative">
-            <button onclick="closeModal('admin-pin-modal')" class="absolute top-4 right-4 w-7 h-7 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 flex items-center justify-center">
-                <i class="fa-solid fa-xmark text-xs"></i>
-            </button>
-            <div class="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
-                <i class="fa-solid fa-shield-halved"></i>
-            </div>
-            <h3 class="font-bold text-stone-800 text-base mb-1">ยืนยันสิทธิ์ Admin</h3>
-            <p class="text-xs text-stone-500 mb-4">กรุณากรอกรหัส PIN สำหรับผู้ดูแลระบบ<br><span class="text-[10px] text-amber-600 font-semibold">(รหัสเริ่มต้น: 1234)</span></p>
-            <form onsubmit="verifyAdminPin(event)">
-                <input type="password" id="input-admin-pin" placeholder="PIN 4 หลัก" maxlength="6" required class="w-full text-center tracking-widest text-lg px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none mb-3 font-bold">
-                <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl text-xs transition">
-                    ยืนยันเข้าสู่ระบบ Admin
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- USER LOGIN / REGISTRATION MODAL -->
-    <div id="user-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] flex flex-col">
-            <button onclick="closeModal('user-modal')" class="absolute top-4 right-4 w-7 h-7 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 flex items-center justify-center">
-                <i class="fa-solid fa-xmark text-xs"></i>
-            </button>
-
-            <h3 class="font-bold text-stone-800 text-base mb-1 text-center">เข้าสู่ระบบ / สมัครสมาชิก</h3>
-            <p class="text-xs text-stone-500 mb-3 text-center">เลือกชื่อผู้ใช้หรือสมัครสมาชิกใหม่เพื่อสั่งซื้อกาแฟ</p>
-
-            <div class="mb-4">
-                <label class="block text-xs font-bold text-stone-700 mb-1.5"><i class="fa-solid fa-users mr-1"></i> เลือกรหัสสมาชิก / เข้าสู่ระบบ</label>
-                <div id="user-list-container" class="space-y-1.5 max-h-36 overflow-y-auto border border-stone-200 rounded-xl p-2">
-                    <!-- Dynamic User List -->
-                </div>
-            </div>
-
-            <div class="border-t border-stone-200 pt-3">
-                <h4 class="font-bold text-xs text-stone-700 mb-2 flex items-center gap-1.5">
-                    <i class="fa-solid fa-user-plus text-amber-600"></i> สมัครสมาชิกใหม่
-                </h4>
-                <form onsubmit="registerUser(event)" class="space-y-2">
+            <div class="overflow-y-auto space-y-4 text-left pr-1">
+                <!-- PromptPay Config Section -->
+                <div class="space-y-2.5">
                     <div>
-                        <input type="text" id="reg-name" placeholder="ชื่อผู้ใช้ (Username)" required class="w-full px-3 py-2 text-xs border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
+                        <label class="block text-xs font-bold text-stone-600 mb-1">หมายเลข พร้อมเพย์ (PromptPay ID)</label>
+                        <input type="text" id="input-promptpay-id" placeholder="เช่น 0812345678 หรือ 1100123456789" class="w-full px-3 py-2 text-xs border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
+
                     <div>
-                        <input type="password" id="reg-pin" placeholder="รหัสผ่าน / PIN (4-6 หลัก)" required maxlength="6" class="w-full px-3 py-2 text-xs border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
+                        <label class="block text-xs font-bold text-stone-600 mb-1">เปลี่ยนรหัส PIN Admin</label>
+                        <input type="password" id="input-admin-new-pin" placeholder="รหัส PIN ใหม่ (4-6 หลัก)" class="w-full px-3 py-2 text-xs border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
-                    <button type="submit" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-2 rounded-xl text-xs transition">
-                        สมัครสมาชิก
+
+                    <button onclick="savePromptPayConfig()" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-2 rounded-xl text-xs transition">
+                        บันทึกการตั้งค่า Admin
                     </button>
-                </form>
+                </div>
+
+                <!-- Admin User Management Section (DELETE USERS HERE) -->
+                <div class="border-t border-stone-200 pt-3">
+                    <h4 class="font-bold text-xs text-stone-800 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span><i class="fa-solid fa-users-gear text-amber-700 mr-1"></i> จัดการรายชื่อสมาชิก</span>
+                        <span class="text-[10px] text-stone-400 font-normal">กดปุ่มถังขยะเพื่อลบ</span>
+                    </h4>
+                    <div id="admin-user-manage-list" class="space-y-1.5 max-h-40 overflow-y-auto border border-stone-200 rounded-xl p-2 bg-stone-50/50 divide-y divide-stone-100">
+                        <!-- Dynamic Admin User List with Delete Buttons -->
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -456,13 +460,12 @@
         <p>© Office Fresh Coffee System • กาแฟสดออฟฟิศ 10 บาท</p>
     </footer>
 
-    <!-- JavaScript Application Logic -->
     <script>
         // LocalStorage keys
-        const STORAGE_USERS = 'office_coffee_users_v3';
-        const STORAGE_CURRENT_USER = 'office_coffee_active_user_v3';
-        const STORAGE_LOGS = 'office_coffee_logs_v3';
-        const STORAGE_DEBTS = 'office_coffee_debts_v3';
+        const STORAGE_USERS = 'office_coffee_users_v5';
+        const STORAGE_CURRENT_USER = 'office_coffee_active_user_v5';
+        const STORAGE_LOGS = 'office_coffee_logs_v5';
+        const STORAGE_DEBTS = 'office_coffee_debts_v5';
         const STORAGE_PROMPTPAY = 'office_coffee_promptpay_id_v1';
         const STORAGE_ADMIN_PIN = 'office_coffee_admin_pin_v1';
 
@@ -473,8 +476,8 @@
         let debtItems = [];
         let promptPayId = '0812345678';
         let adminPin = '1234';
-        let pendingAdminAction = null;
         let pendingTargetUserId = null;
+        let pendingAdminAction = null;
         
         // Supabase State
         let supabaseUrl = 'https://cnajtuadqsawrjpoedig.supabase.co'; 
@@ -496,7 +499,7 @@
                     isSupabaseActive = true;
                 }
             } catch (e) {
-                console.warn("Supabase initialization skipped/fallback to local storage", e);
+                console.warn("Supabase initialization fallback", e);
                 isSupabaseActive = false;
             }
         }
@@ -539,14 +542,6 @@
                     saveData();
                 }
             }
-
-            if (!activeUserId && users.length > 0) {
-                activeUserId = users[1] ? users[1].id : users[0].id;
-            }
-
-            if (isSupabaseActive) {
-                fetchFromSupabase();
-            }
         }
 
         function saveData() {
@@ -560,148 +555,88 @@
             }
         }
 
-        async function fetchFromSupabase() {
-            if (!isSupabaseActive || !supabaseClient) return;
-            try {
-                const { data: dbUsers } = await supabaseClient.from('users').select('*');
-                if (dbUsers && dbUsers.length > 0) {
-                    // Sync remote users
-                }
-            } catch (e) {
-                console.warn("Supabase sync warning", e);
-            }
-        }
-
         function renderUI() {
-            const currentUser = users.find(u => u.id === activeUserId) || users[0];
-            if (!currentUser) return;
-
-            // Header elements
-            document.getElementById('header-user-name').innerText = currentUser.name;
-            document.getElementById('current-user-name').innerText = currentUser.name;
-            document.getElementById('user-dept-badge').innerText = currentUser.dept || 'ทั่วไป';
-
-            // Show/Hide Admin Settings Button
+            const viewLogin = document.getElementById('view-login');
+            const viewKiosk = document.getElementById('view-kiosk');
+            const viewDash = document.getElementById('view-dashboard');
+            const navTabs = document.getElementById('nav-tabs');
+            const headerUserSection = document.getElementById('header-user-section');
             const btnSettings = document.getElementById('btn-settings');
-            if (btnSettings) {
+
+            const currentUser = users.find(u => u.id === activeUserId);
+
+            if (!currentUser) {
+                // Not logged in -> Show Login Page
+                viewLogin.classList.remove('hidden');
+                viewKiosk.classList.add('hidden');
+                viewDash.classList.add('hidden');
+                navTabs.classList.add('hidden');
+                headerUserSection.classList.add('hidden');
+                btnSettings.classList.add('hidden');
+                renderLoginUserList();
+            } else {
+                // Logged in -> Show Kiosk Page
+                viewLogin.classList.add('hidden');
+                navTabs.classList.remove('hidden');
+                headerUserSection.classList.remove('hidden');
+
+                document.getElementById('header-user-name').innerText = currentUser.name;
+                document.getElementById('current-user-name').innerText = currentUser.name;
+                document.getElementById('user-dept-badge').innerText = currentUser.dept || 'ทั่วไป';
+
                 if (currentUser.isAdmin) {
                     btnSettings.classList.remove('hidden');
                 } else {
                     btnSettings.classList.add('hidden');
                 }
+
+                // Calculate user debt
+                const userDebt = calculateUserDebt(currentUser.id);
+                document.getElementById('current-user-debt').innerText = `${userDebt} บาท`;
+
+                const btnPayDebt = document.getElementById('btn-pay-debt');
+                if (userDebt > 0) {
+                    btnPayDebt.classList.remove('hidden');
+                } else {
+                    btnPayDebt.classList.add('hidden');
+                }
+
+                renderLogs();
             }
-
-            // Calculate user debt
-            const userDebt = calculateUserDebt(currentUser.id);
-            document.getElementById('current-user-debt').innerText = `${userDebt} บาท`;
-
-            const btnPayDebt = document.getElementById('btn-pay-debt');
-            if (userDebt > 0) {
-                btnPayDebt.classList.remove('hidden');
-            } else {
-                btnPayDebt.classList.add('hidden');
-            }
-
-            renderLogs();
-            renderUserModalList();
         }
 
-        function calculateUserDebt(userId) {
-            return debtItems
-                .filter(d => d.userId === userId && !d.paid)
-                .reduce((sum, d) => sum + d.amount, 0);
-        }
-
-        function renderLogs() {
-            const container = document.getElementById('recent-logs');
+        function renderLoginUserList() {
+            const container = document.getElementById('login-user-list');
             if (!container) return;
             container.innerHTML = '';
 
-            if (logs.length === 0) {
-                container.innerHTML = `<div class="text-center py-3 text-stone-400">ยังไม่มีประวัติการสั่งซื้อ</div>`;
-                return;
-            }
-
-            logs.slice(0, 10).forEach(log => {
-                const isQr = log.method === 'qr';
+            users.forEach(u => {
+                const userDebt = calculateUserDebt(u.id);
                 const div = document.createElement('div');
-                div.className = "py-2 flex items-center justify-between text-stone-700";
+                div.className = "flex items-center gap-2";
+
                 div.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full ${isQr ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
-                        <div>
-                            <span class="font-medium text-stone-800">${log.userName}</span>
-                            <span class="text-[10px] text-stone-400 block">${log.time}</span>
+                    <button type="button" onclick="promptUserLogin('${u.id}')" class="w-full text-left p-3 rounded-2xl bg-stone-50 hover:bg-amber-50 hover:border-amber-300 border border-stone-200 transition flex items-center justify-between text-xs group shadow-sm">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl ${u.isAdmin ? 'bg-amber-500 text-stone-900' : 'bg-stone-200 text-stone-700'} flex items-center justify-center font-bold">
+                                <i class="fa-solid ${u.isAdmin ? 'fa-user-shield' : 'fa-user'}"></i>
+                            </div>
+                            <div>
+                                <span class="font-bold text-stone-800 group-hover:text-amber-900 block">${u.name}</span>
+                                <span class="text-[10px] text-stone-400 block">${u.isAdmin ? 'ผู้ดูแลระบบ' : (u.dept || 'ทั่วไป')}</span>
+                            </div>
                         </div>
-                    </div>
-                    <span class="font-bold ${isQr ? 'text-emerald-700' : 'text-amber-800'}">
-                        ${isQr ? 'โอน QR 10.-' : 'ติดไว้ก่อน 10.-'}
-                    </span>
+                        <span class="${userDebt > 0 ? 'text-red-600 font-bold bg-red-50 px-2 py-1 rounded-lg' : 'text-emerald-600 font-medium'}">${userDebt > 0 ? `ค้าง ${userDebt}฿` : 'กดเข้าใช้งาน'}</span>
+                    </button>
                 `;
                 container.appendChild(div);
             });
         }
 
-        function renderUserModalList() {
-            const container = document.getElementById('user-list-container');
-            if (!container) return;
-            container.innerHTML = '';
-
-            users.forEach(u => {
-                const isActive = u.id === activeUserId;
-                const userDebt = calculateUserDebt(u.id);
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.onclick = () => selectUser(u.id);
-                btn.className = `w-full text-left p-2 rounded-xl flex items-center justify-between transition text-xs ${
-                    isActive ? 'bg-amber-100 border border-amber-300 font-bold text-amber-900' : 'bg-stone-50 hover:bg-stone-100 text-stone-700'
-                }`;
-                btn.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid ${u.isAdmin ? 'fa-user-shield text-amber-600' : 'fa-user text-stone-400'}"></i>
-                        <span>${u.name} ${u.isAdmin ? '<span class="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded ml-1">Admin</span>' : ''}</span>
-                    </div>
-                    <span class="${userDebt > 0 ? 'text-red-600 font-bold' : 'text-stone-400'}">${userDebt > 0 ? `ค้าง ${userDebt}฿` : 'เข้าสู่ระบบ'}</span>
-                `;
-                container.appendChild(btn);
-            });
-        }
-
-        function selectUser(userId) {
-            const targetUser = users.find(u => u.id === userId);
-            if (!targetUser) return;
-
-            if (activeUserId === targetUser.id) {
-                closeModal('user-modal');
-                return;
-            }
-
-            pendingTargetUserId = targetUser.id;
-            document.getElementById('user-pin-title').innerText = `เข้าสู่ระบบ: ${targetUser.name}`;
-            document.getElementById('user-pin-subtitle').innerText = `กรุณากรอกรหัสผ่าน / PIN สำหรับ ${targetUser.name}`;
-            document.getElementById('input-user-pin').value = '';
-            document.getElementById('user-pin-modal').classList.remove('hidden');
-        }
-
-        function verifyUserPin(e) {
-            e.preventDefault();
-            const inputPin = document.getElementById('input-user-pin').value.trim();
-            const targetUser = users.find(u => u.id === pendingTargetUserId);
-
-            if (!targetUser) return;
-
-            const expectedPin = targetUser.isAdmin ? adminPin : (targetUser.pin || '1234');
-
-            if (inputPin === expectedPin || (targetUser.isAdmin && inputPin === adminPin)) {
-                activeUserId = targetUser.id;
-                saveData();
-                renderUI();
-                closeModal('user-pin-modal');
-                closeModal('user-modal');
-                showToast(`เข้าสู่ระบบในชื่อ ${targetUser.name} เรียบร้อยแล้ว`);
-            } else {
-                showToast('รหัสผ่าน / PIN ไม่ถูกต้อง!');
-            }
+        function openRegisterModal() {
+            document.getElementById('reg-name').value = '';
+            document.getElementById('reg-pin').value = '';
+            document.getElementById('register-modal').classList.remove('hidden');
         }
 
         function registerUser(e) {
@@ -737,15 +672,72 @@
             pinInput.value = '';
 
             saveData();
+            closeModal('register-modal');
             renderUI();
-            closeModal('user-modal');
+            switchTab('kiosk');
             showToast(`สมัครสมาชิกสำเร็จ: ยินดีต้อนรับ ${name}`);
+        }
+
+        function promptUserLogin(userId) {
+            const targetUser = users.find(u => u.id === userId);
+            if (!targetUser) return;
+
+            pendingTargetUserId = targetUser.id;
+            document.getElementById('user-pin-title').innerText = `เข้าสู่ระบบ: ${targetUser.name}`;
+            document.getElementById('user-pin-subtitle').innerText = `กรุณากรอกรหัสผ่าน / PIN สำหรับ ${targetUser.name}`;
+            document.getElementById('input-user-pin').value = '';
+            document.getElementById('user-pin-modal').classList.remove('hidden');
+        }
+
+        function verifyUserPin(e) {
+            e.preventDefault();
+            const inputPin = document.getElementById('input-user-pin').value.trim();
+            const targetUser = users.find(u => u.id === pendingTargetUserId);
+
+            if (!targetUser) return;
+
+            const expectedPin = targetUser.isAdmin ? adminPin : (targetUser.pin || '1234');
+
+            if (inputPin === expectedPin || (targetUser.isAdmin && inputPin === adminPin)) {
+                activeUserId = targetUser.id;
+                saveData();
+                closeModal('user-pin-modal');
+                renderUI();
+                switchTab('kiosk');
+                showToast(`ยินดีต้อนรับ ${targetUser.name} เข้าสู่ระบบ`);
+            } else {
+                showToast('รหัสผ่าน / PIN ไม่ถูกต้อง!');
+            }
+        }
+
+        function logoutUser() {
+            activeUserId = null;
+            saveData();
+            renderUI();
+            showToast('ออกจากระบบเรียบร้อยแล้ว');
+        }
+
+        function deleteUser(userId, userName) {
+            users = users.filter(u => u.id !== userId);
+            if (activeUserId === userId) {
+                activeUserId = null;
+            }
+            saveData();
+            renderAdminUserManageList();
+            renderUI();
+            showToast(`ลบผู้ใช้ ${userName} ออกจากระบบเรียบร้อยแล้ว`);
+        }
+
+        function calculateUserDebt(userId) {
+            return debtItems
+                .filter(d => d.userId === userId && !d.paid)
+                .reduce((sum, d) => sum + d.amount, 0);
         }
 
         function handleOrder(method) {
             const currentUser = users.find(u => u.id === activeUserId);
             if (!currentUser) {
-                openUserModal();
+                renderUI();
                 return;
             }
 
@@ -765,7 +757,6 @@
 
             const nowStr = new Date().toLocaleString('th-TH', { hour12: false });
 
-            // Create log
             logs.unshift({
                 id: 'log_' + Date.now(),
                 userId: currentUser.id,
@@ -775,7 +766,6 @@
                 time: nowStr
             });
 
-            // Update user cups
             currentUser.totalCups = (currentUser.totalCups || 0) + 1;
 
             if (method === 'debt') {
@@ -906,40 +896,46 @@
             showToast(`เคลียร์ยอดติดไว้ ${selectedIds.length * 10} บาท เรียบร้อยแล้ว`);
         }
 
-        function openAdminPinModal(onSuccessCallback) {
-            if (onSuccessCallback) {
-                pendingAdminAction = onSuccessCallback;
-            }
-            document.getElementById('input-admin-pin').value = '';
-            document.getElementById('admin-pin-modal').classList.remove('hidden');
-        }
-
-        function verifyAdminPin(e) {
-            e.preventDefault();
-            const inputPin = document.getElementById('input-admin-pin').value;
-            if (inputPin === adminPin) {
-                closeModal('admin-pin-modal');
-                if (pendingAdminAction) {
-                    const action = pendingAdminAction;
-                    pendingAdminAction = null;
-                    action();
-                }
-            } else {
-                showToast('รหัส PIN Admin ไม่ถูกต้อง!');
-            }
-        }
-
         function openPromptPayConfigModal() {
             const currentUser = users.find(u => u.id === activeUserId);
             if (!currentUser || !currentUser.isAdmin) {
-                openAdminPinModal(() => {
-                    document.getElementById('input-promptpay-id').value = promptPayId;
-                    document.getElementById('promptpay-config-modal').classList.remove('hidden');
-                });
+                showToast('สิทธิ์ไม่ถูกต้อง สำหรับผู้ดูแลระบบเท่านั้น');
                 return;
             }
             document.getElementById('input-promptpay-id').value = promptPayId;
+            renderAdminUserManageList();
             document.getElementById('promptpay-config-modal').classList.remove('hidden');
+        }
+
+        function renderAdminUserManageList() {
+            const container = document.getElementById('admin-user-manage-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const nonAdminUsers = users.filter(u => !u.isAdmin);
+            if (nonAdminUsers.length === 0) {
+                container.innerHTML = `<p class="text-xs text-stone-400 text-center py-2">ไม่มีสมาชิกทั่วไปในระบบ</p>`;
+                return;
+            }
+
+            nonAdminUsers.forEach(u => {
+                const userDebt = calculateUserDebt(u.id);
+                const div = document.createElement('div');
+                div.className = "py-1.5 flex items-center justify-between text-xs";
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-user text-stone-400 text-xs"></i>
+                        <div>
+                            <span class="font-semibold text-stone-800 block leading-tight">${u.name}</span>
+                            <span class="text-[10px] text-stone-400">${userDebt > 0 ? `ติดค้าง ${userDebt}฿` : 'ไม่มีค้างชำระ'}</span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="deleteUser('${u.id}', '${u.name}')" title="ลบผู้ใช้นี้" class="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold transition border border-red-200 flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can text-[10px]"></i> ลบ
+                    </button>
+                `;
+                container.appendChild(div);
+            });
         }
 
         function savePromptPayConfig() {
@@ -962,73 +958,34 @@
             renderUI();
         }
 
-        function downloadQRCode(imgElementId, fileName) {
-            const imgEl = document.getElementById(imgElementId);
-            if (!imgEl || !imgEl.src) return;
+        function renderLogs() {
+            const container = document.getElementById('recent-logs');
+            if (!container) return;
+            container.innerHTML = '';
 
-            const a = document.createElement('a');
-            a.href = imgEl.src;
-            a.download = fileName || 'promptpay-qr.png';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            showToast('ดาวน์โหลด QR Code เรียบร้อยแล้ว');
-        }
-
-        function generatePromptPayQR(target, amount) {
-            let sanitized = target.replace(/[^0-9]/g, '');
-            let targetType = '01';
-
-            if (sanitized.length === 10) {
-                sanitized = '0066' + sanitized.substring(1);
-                targetType = '01';
-            } else if (sanitized.length === 13) {
-                targetType = '02';
+            if (logs.length === 0) {
+                container.innerHTML = `<div class="text-center py-3 text-stone-400">ยังไม่มีประวัติการสั่งซื้อ</div>`;
+                return;
             }
 
-            const f00 = '000201';
-            const f01 = '010211';
-            const ppTargetTag = targetType + padLeft(sanitized.length.toString(), 2) + sanitized;
-            const ppAppId = '0016A000000677010111';
-            const merchantInfoContent = ppAppId + ppTargetTag;
-            const f29 = '29' + padLeft(merchantInfoContent.length.toString(), 2) + merchantInfoContent;
-            const f53 = '5303764';
-            
-            let f54 = '';
-            if (amount && amount > 0) {
-                const amtStr = parseFloat(amount).toFixed(2);
-                f54 = '54' + padLeft(amtStr.length.toString(), 2) + amtStr;
-            }
-
-            const f58 = '5802TH';
-            const f63 = '6304';
-
-            const rawPayload = f00 + f01 + f29 + f53 + f54 + f58 + f63;
-            const crc = crc16Hex(rawPayload);
-            const fullPayload = rawPayload + crc;
-
-            return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(fullPayload)}`;
-        }
-
-        function padLeft(str, len) {
-            while (str.length < len) str = '0' + str;
-            return str;
-        }
-
-        function crc16Hex(str) {
-            let crc = 0xFFFF;
-            for (let i = 0; i < str.length; i++) {
-                crc ^= str.charCodeAt(i) << 8;
-                for (let j = 0; j < 8; j++) {
-                    if ((crc & 0x8000) !== 0) {
-                        crc = (crc << 1) ^ 0x1021;
-                    } else {
-                        crc = crc << 1;
-                    }
-                    crc = crc & 0xFFFF;
-                }
-            }
-            return padLeft(crc.toString(16).toUpperCase(), 4);
+            logs.slice(0, 10).forEach(log => {
+                const isQr = log.method === 'qr';
+                const div = document.createElement('div');
+                div.className = "py-2 flex items-center justify-between text-stone-700";
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full ${isQr ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
+                        <div>
+                            <span class="font-medium text-stone-800">${log.userName}</span>
+                            <span class="text-[10px] text-stone-400 block">${log.time}</span>
+                        </div>
+                    </div>
+                    <span class="font-bold ${isQr ? 'text-emerald-700' : 'text-amber-800'}">
+                        ${isQr ? 'โอน QR 10.-' : 'ติดไว้ก่อน 10.-'}
+                    </span>
+                `;
+                container.appendChild(div);
+            });
         }
 
         function switchTab(tab) {
@@ -1118,9 +1075,73 @@
             }
         }
 
-        function openUserModal() {
-            renderUserModalList();
-            document.getElementById('user-modal').classList.remove('hidden');
+        function downloadQRCode(imgElementId, fileName) {
+            const imgEl = document.getElementById(imgElementId);
+            if (!imgEl || !imgEl.src) return;
+
+            const a = document.createElement('a');
+            a.href = imgEl.src;
+            a.download = fileName || 'promptpay-qr.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('ดาวน์โหลด QR Code เรียบร้อยแล้ว');
+        }
+
+        function generatePromptPayQR(target, amount) {
+            let sanitized = target.replace(/[^0-9]/g, '');
+            let targetType = '01';
+
+            if (sanitized.length === 10) {
+                sanitized = '0066' + sanitized.substring(1);
+                targetType = '01';
+            } else if (sanitized.length === 13) {
+                targetType = '02';
+            }
+
+            const f00 = '000201';
+            const f01 = '010211';
+            const ppTargetTag = targetType + padLeft(sanitized.length.toString(), 2) + sanitized;
+            const ppAppId = '0016A000000677010111';
+            const merchantInfoContent = ppAppId + ppTargetTag;
+            const f29 = '29' + padLeft(merchantInfoContent.length.toString(), 2) + merchantInfoContent;
+            const f53 = '5303764';
+            
+            let f54 = '';
+            if (amount && amount > 0) {
+                const amtStr = parseFloat(amount).toFixed(2);
+                f54 = '54' + padLeft(amtStr.length.toString(), 2) + amtStr;
+            }
+
+            const f58 = '5802TH';
+            const f63 = '6304';
+
+            const rawPayload = f00 + f01 + f29 + f53 + f54 + f58 + f63;
+            const crc = crc16Hex(rawPayload);
+            const fullPayload = rawPayload + crc;
+
+            return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(fullPayload)}`;
+        }
+
+        function padLeft(str, len) {
+            while (str.length < len) str = '0' + str;
+            return str;
+        }
+
+        function crc16Hex(str) {
+            let crc = 0xFFFF;
+            for (let i = 0; i < str.length; i++) {
+                crc ^= str.charCodeAt(i) << 8;
+                for (let j = 0; j < 8; j++) {
+                    if ((crc & 0x8000) !== 0) {
+                        crc = (crc << 1) ^ 0x1021;
+                    } else {
+                        crc = crc << 1;
+                    }
+                    crc = crc & 0xFFFF;
+                }
+            }
+            return padLeft(crc.toString(16).toUpperCase(), 4);
         }
 
         function closeModal(modalId) {
