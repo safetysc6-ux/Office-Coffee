@@ -165,19 +165,35 @@
                 <h2 class="text-2xl font-extrabold text-amber-100 tracking-wide">กาแฟสดคั่วบดใหม่</h2>
                 <p class="text-xs text-stone-300 mt-1 max-w-xs mx-auto">เข้มข้น หอม กลมกล่อม ชงสดใหม่ทุกแก้วด้วยเมล็ดกาแฟคุณภาพ</p>
 
-                <div class="mt-6 pt-5 border-t border-white/10 space-y-3">
-                    <p class="text-xs font-semibold text-amber-200/80 uppercase tracking-wider mb-2">เลือกวิธีการชำระเงิน (10 บาท)</p>
+                <!-- Quantity Selector -->
+                <div class="mt-5 bg-amber-900/40 border border-amber-500/20 p-3 rounded-2xl flex items-center justify-between max-w-xs mx-auto">
+                    <span class="text-xs font-semibold text-amber-200">ระบุจำนวนแก้ว:</span>
+                    <div class="flex items-center gap-3 bg-stone-900/80 px-2.5 py-1 rounded-xl border border-stone-700">
+                        <button type="button" onclick="adjustQuantity(-1)" class="w-7 h-7 rounded-lg bg-amber-600/30 hover:bg-amber-600 text-amber-300 hover:text-white font-bold flex items-center justify-center transition active:scale-90 text-xs">
+                            <i class="fa-solid fa-minus"></i>
+                        </button>
+                        <span id="order-quantity" class="font-black text-base text-amber-100 min-w-[20px]">1</span>
+                        <button type="button" onclick="adjustQuantity(1)" class="w-7 h-7 rounded-lg bg-amber-600/30 hover:bg-amber-600 text-amber-300 hover:text-white font-bold flex items-center justify-center transition active:scale-90 text-xs">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-white/10 space-y-3">
+                    <p class="text-xs font-semibold text-amber-200/80 uppercase tracking-wider mb-2">
+                        รวมชำระ <span id="display-total-amount" class="text-amber-400 font-extrabold text-sm">10</span> บาท
+                    </p>
                     
                     <!-- Payment Action 1: QR Transfer -->
                     <button onclick="handleOrder('qr')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2.5 text-base active:scale-[0.98]">
                         <i class="fa-solid fa-qrcode text-lg"></i>
-                        <span>เงินโอน (สแกน QR Code)</span>
+                        <span id="btn-qr-label">เงินโอน (สแกน QR Code 10.-)</span>
                     </button>
 
                     <!-- Payment Action 2: Put on Tab (Pay Later) -->
                     <button onclick="handleOrder('debt')" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2.5 text-base active:scale-[0.98]">
                         <i class="fa-solid fa-file-pen text-lg"></i>
-                        <span>ติดไว้ก่อน (บันทึกยอดชำระ)</span>
+                        <span id="btn-debt-label">ติดไว้ก่อน (บันทึกยอดชำระ 10.-)</span>
                     </button>
                 </div>
             </div>
@@ -310,11 +326,11 @@
             </div>
 
             <div class="bg-amber-50 p-2.5 rounded-xl border border-amber-200 mb-3 text-xs text-amber-900 font-medium flex justify-between items-center">
-                <span>ยอดโอน: <strong class="text-amber-800 text-sm">10.00 บาท</strong></span>
+                <span>ยอดโอน: <strong id="qr-modal-amount" class="text-amber-800 text-sm">10.00 บาท</strong></span>
                 <span id="display-promptpay-id" class="text-[10px] bg-amber-200/60 text-amber-900 px-2 py-0.5 rounded">พร้อมเพย์</span>
             </div>
 
-            <button onclick="downloadQRCode('qr-image', 'promptpay-coffee-10baht.png')" class="w-full mb-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium py-2 rounded-xl text-xs transition flex items-center justify-center gap-2">
+            <button onclick="downloadQRCode('qr-image', 'promptpay-coffee.png')" class="w-full mb-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium py-2 rounded-xl text-xs transition flex items-center justify-center gap-2">
                 <i class="fa-solid fa-download"></i> ดาวน์โหลด QR Code
             </button>
 
@@ -478,6 +494,7 @@
         let adminPin = '1234';
         let pendingTargetUserId = null;
         let pendingAdminAction = null;
+        let orderQuantity = 1;
         
         // Supabase State
         let supabaseUrl = 'https://cnajtuadqsawrjpoedig.supabase.co'; 
@@ -488,8 +505,15 @@
 
         window.onload = function() {
             initSupabase();
-            loadData();
+            loadLocalData();
             renderUI();
+
+            // Auto sync from Supabase every 5 seconds for multi-device sync
+            setInterval(() => {
+                if (isSupabaseActive) {
+                    fetchFromSupabase();
+                }
+            }, 5000);
         };
 
         function initSupabase() {
@@ -497,6 +521,7 @@
                 if (window.supabase && supabaseUrl && supabaseKey) {
                     supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
                     isSupabaseActive = true;
+                    fetchFromSupabase();
                 }
             } catch (e) {
                 console.warn("Supabase initialization fallback", e);
@@ -504,7 +529,98 @@
             }
         }
 
-        function loadData() {
+        async function fetchFromSupabase() {
+            if (!isSupabaseActive || !supabaseClient) return;
+
+            try {
+                // Fetch Users
+                const { data: dbUsers, error: uErr } = await supabaseClient.from('users').select('*');
+                if (!uErr && dbUsers && dbUsers.length > 0) {
+                    users = dbUsers.map(u => ({
+                        id: u.id,
+                        name: u.name,
+                        pin: u.pin || '1234',
+                        dept: u.dept || 'ทั่วไป',
+                        debt: u.debt || 0,
+                        totalCups: u.total_cups || 0,
+                        isAdmin: !!u.is_admin
+                    }));
+                } else if (dbUsers && dbUsers.length === 0) {
+                    // Seed initial admin if database is empty
+                    const defaultAdmin = { id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true };
+                    users = [defaultAdmin];
+                    await supabaseClient.from('users').insert([{
+                        id: defaultAdmin.id,
+                        name: defaultAdmin.name,
+                        pin: defaultAdmin.pin,
+                        dept: defaultAdmin.dept,
+                        debt: 0,
+                        total_cups: 0,
+                        is_admin: true
+                    }]);
+                }
+
+                // Ensure admin exists locally
+                if (!users.some(u => u.isAdmin)) {
+                    users.unshift({ id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true });
+                }
+
+                // Fetch Logs
+                const { data: dbLogs, error: lErr } = await supabaseClient.from('coffee_logs').select('*').order('created_at', { ascending: false });
+                if (!lErr && dbLogs) {
+                    logs = dbLogs.map(l => ({
+                        id: l.id,
+                        userId: l.user_id,
+                        userName: l.user_name,
+                        method: l.method,
+                        amount: l.amount,
+                        time: l.time_str
+                    }));
+                }
+
+                // Fetch Debts
+                const { data: dbDebts, error: dErr } = await supabaseClient.from('debts').select('*');
+                if (!dErr && dbDebts) {
+                    debtItems = dbDebts.map(d => ({
+                        id: d.id,
+                        userId: d.user_id,
+                        amount: d.amount,
+                        paid: d.paid,
+                        timeStr: d.time_str
+                    }));
+                }
+
+                saveLocalData();
+                renderUI();
+                if (!document.getElementById('view-dashboard').classList.contains('hidden')) {
+                    renderDashboard();
+                }
+            } catch (e) {
+                console.warn("Error syncing with Supabase:", e);
+            }
+        }
+
+        function adjustQuantity(delta) {
+            orderQuantity += delta;
+            if (orderQuantity < 1) orderQuantity = 1;
+            if (orderQuantity > 10) orderQuantity = 10;
+            updateQuantityUI();
+        }
+
+        function updateQuantityUI() {
+            const total = orderQuantity * 10;
+            const qEl = document.getElementById('order-quantity');
+            const totalEl = document.getElementById('display-total-amount');
+            const qrLabel = document.getElementById('btn-qr-label');
+            const debtLabel = document.getElementById('btn-debt-label');
+
+            if (qEl) qEl.innerText = orderQuantity;
+            if (totalEl) totalEl.innerText = total;
+            if (qrLabel) qrLabel.innerText = `เงินโอน (สแกน QR Code ${total}.-)`;
+            if (debtLabel) debtLabel.innerText = `ติดไว้ก่อน (บันทึกยอดชำระ ${total}.-)`;
+        }
+
+        function loadLocalData() {
             try {
                 const u = localStorage.getItem(STORAGE_USERS);
                 if (u) users = JSON.parse(u);
@@ -527,24 +643,17 @@
                 console.error("Error loading local data", e);
             }
 
-            // Ensure Admin user and default users exist
             if (users.length === 0) {
                 users = [
                     { id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true },
                     { id: 'u1', name: 'คุณสมชาย', pin: '1111', dept: 'ทั่วไป', debt: 0, totalCups: 0, isAdmin: false },
                     { id: 'u2', name: 'คุณอนันต์', pin: '2222', dept: 'ทั่วไป', debt: 0, totalCups: 0, isAdmin: false }
                 ];
-                saveData();
-            } else {
-                const hasAdmin = users.some(u => u.isAdmin);
-                if (!hasAdmin) {
-                    users.unshift({ id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true });
-                    saveData();
-                }
+                saveLocalData();
             }
         }
 
-        function saveData() {
+        function saveLocalData() {
             try {
                 localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
                 localStorage.setItem(STORAGE_CURRENT_USER, activeUserId || '');
@@ -566,7 +675,6 @@
             const currentUser = users.find(u => u.id === activeUserId);
 
             if (!currentUser) {
-                // Not logged in -> Show Login Page
                 viewLogin.classList.remove('hidden');
                 viewKiosk.classList.add('hidden');
                 viewDash.classList.add('hidden');
@@ -575,7 +683,6 @@
                 btnSettings.classList.add('hidden');
                 renderLoginUserList();
             } else {
-                // Logged in -> Show Kiosk Page
                 viewLogin.classList.add('hidden');
                 navTabs.classList.remove('hidden');
                 headerUserSection.classList.remove('hidden');
@@ -590,7 +697,6 @@
                     btnSettings.classList.add('hidden');
                 }
 
-                // Calculate user debt
                 const userDebt = calculateUserDebt(currentUser.id);
                 document.getElementById('current-user-debt').innerText = `${userDebt} บาท`;
 
@@ -601,6 +707,7 @@
                     btnPayDebt.classList.add('hidden');
                 }
 
+                updateQuantityUI();
                 renderLogs();
             }
         }
@@ -639,7 +746,7 @@
             document.getElementById('register-modal').classList.remove('hidden');
         }
 
-        function registerUser(e) {
+        async function registerUser(e) {
             e.preventDefault();
             const nameInput = document.getElementById('reg-name');
             const pinInput = document.getElementById('reg-pin');
@@ -671,7 +778,25 @@
             nameInput.value = '';
             pinInput.value = '';
 
-            saveData();
+            saveLocalData();
+
+            // Insert into Supabase DB
+            if (isSupabaseActive && supabaseClient) {
+                try {
+                    await supabaseClient.from('users').insert([{
+                        id: newUser.id,
+                        name: newUser.name,
+                        pin: newUser.pin,
+                        dept: newUser.dept,
+                        debt: 0,
+                        total_cups: 0,
+                        is_admin: false
+                    }]);
+                } catch(err) {
+                    console.error("Supabase insert user error", err);
+                }
+            }
+
             closeModal('register-modal');
             renderUI();
             switchTab('kiosk');
@@ -700,7 +825,7 @@
 
             if (inputPin === expectedPin || (targetUser.isAdmin && inputPin === adminPin)) {
                 activeUserId = targetUser.id;
-                saveData();
+                saveLocalData();
                 closeModal('user-pin-modal');
                 renderUI();
                 switchTab('kiosk');
@@ -712,17 +837,27 @@
 
         function logoutUser() {
             activeUserId = null;
-            saveData();
+            saveLocalData();
             renderUI();
             showToast('ออกจากระบบเรียบร้อยแล้ว');
         }
 
-        function deleteUser(userId, userName) {
+        async function deleteUser(userId, userName) {
             users = users.filter(u => u.id !== userId);
             if (activeUserId === userId) {
                 activeUserId = null;
             }
-            saveData();
+            saveLocalData();
+
+            // Delete from Supabase
+            if (isSupabaseActive && supabaseClient) {
+                try {
+                    await supabaseClient.from('users').delete().eq('id', userId);
+                } catch(err) {
+                    console.error("Supabase delete user error", err);
+                }
+            }
+
             renderAdminUserManageList();
             renderUI();
             showToast(`ลบผู้ใช้ ${userName} ออกจากระบบเรียบร้อยแล้ว`);
@@ -741,44 +876,286 @@
                 return;
             }
 
+            const totalAmount = orderQuantity * 10;
+
             if (method === 'qr') {
-                const qrUrl = generatePromptPayQR(promptPayId, 10);
+                const qrUrl = generatePromptPayQR(promptPayId, totalAmount);
                 document.getElementById('qr-image').src = qrUrl;
                 document.getElementById('display-promptpay-id').innerText = promptPayId;
+                document.getElementById('qr-modal-amount').innerText = `${totalAmount}.00 บาท`;
                 document.getElementById('qr-modal').classList.remove('hidden');
             } else if (method === 'debt') {
                 confirmOrderSuccess('debt');
             }
         }
 
-        function confirmOrderSuccess(method) {
+        async function confirmOrderSuccess(method) {
+            const currentUser = users.find(u => u.id === activeUserId);
+            if (!currentUser) return;
+
+            const totalAmount = orderQuantity * 10;
+            const cupsCount = orderQuantity;
+            const nowStr = new Date().toLocaleString('th-TH', { hour12: false });
+            
+            const newLog = {
+                id: 'log_' + Date.now(),
+                userId: currentUser.id,
+                userName: currentUser.name,
+                method: method,
+                amount: totalAmount,
+                cups: cupsCount,
+                time: nowStr
+            };
+
+            logs.unshift(newLog);
+            currentUser.totalCups = (currentUser.totalCups || 0) + cupsCount;
+
+            let newDebt = null;
+            if (method === 'debt') {
+                newDebt = {
+                    id: 'd_' + Date.now(),
+                    userId: currentUser.id,
+                    amount: totalAmount,
+                    cups: cupsCount,
+                    paid: false,
+                    timeStr: nowStr
+                };
+                debtItems.push(newDebt);
+            }
+
+            saveLocalData();
+
+            // Insert to Supabase DB
+            if (isSupabaseActive && supabaseClient) {
+                try {
+                    await supabaseClient.from('coffee_logs').insert([{
+                        id: newLog.id,
+                        user_id: newLog.userId,
+                        user_name: newLog.userName,
+                        method: newLog.method,
+                        amount: totalAmount,
+                        cups: cupsCount,
+                        time_str: newLog.time
+                    }]);
+
+                    await supabaseClient.from('users').update({ total_cups: currentUser.totalCups }).eq('id', currentUser.id);
+
+                    if (newDebt) {
+                        await supabaseClient.from('debts').insert([{
+                            id: newDebt.id,
+                            user_id: newDebt.userId,
+                            amount: totalAmount,
+                            cups: cupsCount,
+                            paid: false,
+                            time_str: newDebt.timeStr
+                        }]);
+                    }
+                } catch(err) {
+                    console.error("Supabase order sync error", err);
+                }
+            }
+
+            closeModal('qr-modal');
+            const cupsForAnim = orderQuantity;
+            orderQuantity = 1; // Reset quantity
+            updateQuantityUI();
+            renderUI();
+            startDispensingAnimation(cupsForAnim);
+        }
+
+        function startDispensingAnimation(cups = 1) {
+            const dispenseModal = document.getElementById('dispense-modal');
+            const progressBar = document.getElementById('dispense-progress');
+            const statusText = document.getElementById('dispense-status-text');
+
+            dispenseModal.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            statusText.innerText = `กำลังเริ่มบดเมล็ดกาแฟสด (${cups} แก้ว)...`;
+
+            setTimeout(() => {
+                progressBar.style.width = '40%';
+                statusText.innerText = `กำลังทำความร้อนและสกัดกาแฟ (${cups} แก้ว)...`;
+            }, 1000);
+
+            setTimeout(() => {
+                progressBar.style.width = '80%';
+                statusText.innerText = `กำลังเทกาแฟลงในแก้ว (${cups} แก้ว)...`;
+            }, 2300);
+
+            setTimeout(() => {
+                progressBar.style.width = '100%';
+                statusText.innerText = `เสร็จเรียบร้อย! เชิญรับกาแฟสด ${cups} แก้วได้เลยครับ`;
+            }, 3500);
+
+            setTimeout(() => {
+                dispenseModal.classList.add('hidden');
+                showToast(`ชงกาแฟสด ${cups} แก้วเสร็จสิ้น ขอให้มีความสุขกับการทำงานครับ! ☕`);
+            }, 4300);
+        }
+
+        function openSettleDebtModal() {
+            const currentUser = users.find(u => u.id === activeUserId);
+            if (!currentUser) return;
+
+            const userUnpaidDebts = debtItems.filter(d => d.userId === currentUser.id && !d.paid);
+            const listContainer = document.getElementById('settle-items-list');
+            listContainer.innerHTML = '';
+
+            if (userUnpaidDebts.length === 0) {
+                listContainer.innerHTML = `<p class="text-xs text-stone-400 text-center py-4">ไม่มีรายการติดค้างชำระ</p>`;
+                document.getElementById('settle-amount').innerText = '0 บาท';
+                document.getElementById('btn-confirm-settle').disabled = true;
+                document.getElementById('settle-modal').classList.remove('hidden');
+                return;
+            }
+
+            userUnpaidDebts.forEach((debt) => {
+                const cupsCount = debt.cups || Math.round(debt.amount / 10);
+                const div = document.createElement('div');
+                div.className = "py-2 px-1 flex items-center justify-between text-xs";
+                div.innerHTML = `
+                    <label class="flex items-center gap-2.5 cursor-pointer flex-1">
+                        <input type="checkbox" value="${debt.id}" onchange="updateSettleTotal()" class="debt-item-checkbox w-4 h-4 rounded text-amber-600 focus:ring-amber-500">
+                        <div>
+                            <span class="font-bold text-stone-800">กาแฟสด ${cupsCount} แก้ว</span>
+                            <span class="text-[10px] text-stone-400 block">${debt.timeStr}</span>
+                        </div>
+                    </label>
+                    <span class="font-bold text-amber-900">${debt.amount} บาท</span>
+                `;
+                listContainer.appendChild(div);
+            });
+
+            document.getElementById('select-all-debts').checked = false;
+            updateSettleTotal();
+            document.getElementById('settle-modal').classList.remove('hidden');
+        }
+
+        function toggleSelectAllDebts(masterCheckbox) {
+            const checkboxes = document.querySelectorAll('.debt-item-checkbox');
+            checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
+            updateSettleTotal();
+        }
+
+        function updateSettleTotal() {
+            const checkboxes = document.querySelectorAll('.debt-item-checkbox:checked');
+            let totalAmount = 0;
+            checkboxes.forEach(cb => {
+                const debt = debtItems.find(d => d.id === cb.value);
+                if (debt) {
+                    totalAmount += (debt.amount || 10);
+                }
+            });
+
+            document.getElementById('settle-selected-count').innerText = `เลือก ${checkboxes.length} รายการ`;
+            document.getElementById('settle-amount').innerText = `${totalAmount} บาท`;
+
+            const btnConfirm = document.getElementById('btn-confirm-settle');
+            const qrContainer = document.getElementById('settle-qr-container');
+
+            if (totalAmount > 0) {
+                btnConfirm.disabled = false;
+                qrContainer.classList.remove('hidden');
+                const qrUrl = generatePromptPayQR(promptPayId, totalAmount);
+                document.getElementById('settle-qr-image').src = qrUrl;
+            } else {
+                btnConfirm.disabled = true;
+                qrContainer.classList.add('hidden');
+            }
+        }
+
+        async function confirmSettleDebt() {
+            const checkboxes = document.querySelectorAll('.debt-item-checkbox:checked');
+            if (checkboxes.length === 0) return;
+
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+            let totalClearedAmount = 0;
+
+            debtItems.forEach(d => {
+                if (selectedIds.includes(d.id)) {
+                    d.paid = true;
+                    totalClearedAmount += (d.amount || 10);
+                }
+            });
+
+            saveLocalData();
+
+            // Sync paid status to Supabase
+            if (isSupabaseActive && supabaseClient) {
+                try {
+                    for (const id of selectedIds) {
+                        await supabaseClient.from('debts').update({ paid: true }).eq('id', id);
+                    }
+                } catch(err) {
+                    console.error("Supabase settle debt error", err);
+                }
+            }
+
+            closeModal('settle-modal');
+            renderUI();
+            showToast(`เคลียร์ยอดติดไว้ ${totalClearedAmount} บาท เรียบร้อยแล้ว`);
+        }
+        }
+
+        async function confirmOrderSuccess(method) {
             const currentUser = users.find(u => u.id === activeUserId);
             if (!currentUser) return;
 
             const nowStr = new Date().toLocaleString('th-TH', { hour12: false });
-
-            logs.unshift({
+            const newLog = {
                 id: 'log_' + Date.now(),
                 userId: currentUser.id,
                 userName: currentUser.name,
                 method: method,
                 amount: 10,
                 time: nowStr
-            });
+            };
 
+            logs.unshift(newLog);
             currentUser.totalCups = (currentUser.totalCups || 0) + 1;
 
+            let newDebt = null;
             if (method === 'debt') {
-                debtItems.push({
+                newDebt = {
                     id: 'd_' + Date.now(),
                     userId: currentUser.id,
                     amount: 10,
                     paid: false,
                     timeStr: nowStr
-                });
+                };
+                debtItems.push(newDebt);
             }
 
-            saveData();
+            saveLocalData();
+
+            // Insert to Supabase DB
+            if (isSupabaseActive && supabaseClient) {
+                try {
+                    await supabaseClient.from('coffee_logs').insert([{
+                        id: newLog.id,
+                        user_id: newLog.userId,
+                        user_name: newLog.userName,
+                        method: newLog.method,
+                        amount: 10,
+                        time_str: newLog.time
+                    }]);
+
+                    await supabaseClient.from('users').update({ total_cups: currentUser.totalCups }).eq('id', currentUser.id);
+
+                    if (newDebt) {
+                        await supabaseClient.from('debts').insert([{
+                            id: newDebt.id,
+                            user_id: newDebt.userId,
+                            amount: 10,
+                            paid: false,
+                            time_str: newDebt.timeStr
+                        }]);
+                    }
+                } catch(err) {
+                    console.error("Supabase order sync error", err);
+                }
+            }
+
             closeModal('qr-modal');
             renderUI();
             startDispensingAnimation();
@@ -878,7 +1255,7 @@
             }
         }
 
-        function confirmSettleDebt() {
+        async function confirmSettleDebt() {
             const checkboxes = document.querySelectorAll('.debt-item-checkbox:checked');
             if (checkboxes.length === 0) return;
 
@@ -890,7 +1267,19 @@
                 }
             });
 
-            saveData();
+            saveLocalData();
+
+            // Sync paid status to Supabase
+            if (isSupabaseActive && supabaseClient) {
+                try {
+                    for (const id of selectedIds) {
+                        await supabaseClient.from('debts').update({ paid: true }).eq('id', id);
+                    }
+                } catch(err) {
+                    console.error("Supabase settle debt error", err);
+                }
+            }
+
             closeModal('settle-modal');
             renderUI();
             showToast(`เคลียร์ยอดติดไว้ ${selectedIds.length * 10} บาท เรียบร้อยแล้ว`);
@@ -970,18 +1359,19 @@
 
             logs.slice(0, 10).forEach(log => {
                 const isQr = log.method === 'qr';
+                const cupsCount = log.cups || Math.round(log.amount / 10);
                 const div = document.createElement('div');
                 div.className = "py-2 flex items-center justify-between text-stone-700";
                 div.innerHTML = `
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full ${isQr ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
                         <div>
-                            <span class="font-medium text-stone-800">${log.userName}</span>
+                            <span class="font-medium text-stone-800">${log.userName} (${cupsCount} แก้ว)</span>
                             <span class="text-[10px] text-stone-400 block">${log.time}</span>
                         </div>
                     </div>
                     <span class="font-bold ${isQr ? 'text-emerald-700' : 'text-amber-800'}">
-                        ${isQr ? 'โอน QR 10.-' : 'ติดไว้ก่อน 10.-'}
+                        ${isQr ? `โอน QR ${log.amount}.-` : `ติดไว้ก่อน ${log.amount}.-`}
                     </span>
                 `;
                 container.appendChild(div);
