@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office Fresh Coffee - กาแฟสดออฟฟิศ 10 บาท</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Kanit -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase JS Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js CDN for Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                    },
+                    colors: {
+                        coffee: {
+                            50: '#fdfbf7',
+                            100: '#f7f2e8',
+                            500: '#a3704c',
+                            600: '#8c5835',
+                            700: '#6f4228',
+                            800: '#4a2c11',
+                            900: '#2d1808',
+                        },
+                        promptpay: {
+                            blue: '#003b6a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #f7f2e8;
+        }
+        .pulse-light {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-stone-800 flex flex-col justify-between selection:bg-amber-200">
+
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-30 bg-stone-900 text-white shadow-md">
+        <div class="max-w-md mx-auto px-4 py-2.5 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-xl bg-amber-600 flex items-center justify-center text-white text-lg shadow">
+                    <i class="fa-solid fa-mug-hot"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-sm leading-tight text-amber-100">Office Fresh Coffee</h1>
+                    <p class="text-[10px] text-stone-400">กาแฟสดบดใหม่ • 10 บาท</p>
+                </div>
+            </div>
+
+            <!-- Header Action Buttons -->
+            <div class="flex items-center gap-1.5">
+                <button id="btn-settings" onclick="openPromptPayConfigModal()" title="ตั้งค่า PromptPay (เฉพาะ Admin)" class="hidden bg-stone-800 hover:bg-stone-700 text-amber-400 p-1.5 rounded-xl border border-stone-700 transition">
+                    <i class="fa-solid fa-gear text-xs"></i>
+                </button>
+                <button onclick="openUserModal()" class="bg-stone-800 hover:bg-stone-700 border border-stone-700 px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5 text-xs font-medium">
+                    <i class="fa-solid fa-user-circle text-amber-400 text-xs"></i>
+                    <span id="header-user-name" class="max-w-[70px] truncate">ผู้ใช้</span>
+                    <i class="fa-solid fa-chevron-down text-[9px] text-stone-400"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs: Kiosk vs Dashboard -->
+        <div class="max-w-md mx-auto px-4 pb-2 flex gap-2 border-t border-stone-800/80 pt-2">
+            <button id="tab-btn-kiosk" onclick="switchTab('kiosk')" class="flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-900 bg-amber-400 shadow transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-mug-saucer"></i> หน้าตู้ชงกาแฟ
+            </button>
+            <button id="tab-btn-dashboard" onclick="switchTab('dashboard')" class="flex-1 py-1.5 text-xs font-bold rounded-xl text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-chart-pie"></i> แดชบอร์ดสรุป
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-md mx-auto w-full px-4 py-4 flex-grow">
+
+        <!-- VIEW 1: KIOSK INTERFACE -->
+        <div id="view-kiosk" class="space-y-4">
+            <!-- Active User Info Bar -->
+            <div id="user-info-card" class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-lg shadow-inner" id="user-avatar">
+                        ☕
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 id="current-user-name" class="font-bold text-stone-800 text-base">กรุณาลงชื่อผู้ใช้</h2>
+                            <span id="user-dept-badge" class="bg-stone-100 text-stone-600 text-[10px] px-2 py-0.5 rounded-md font-medium">แผนก</span>
+                        </div>
+                        <p class="text-xs text-stone-500 mt-0.5">ยอดติดไว้สะสม: <span id="current-user-debt" class="font-bold text-red-600">0 บาท</span></p>
+                    </div>
+                </div>
+                <button id="btn-pay-debt" onclick="openSettleDebtModal()" class="hidden bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs px-3 py-1.5 rounded-xl font-medium transition">
+                    เคลียร์ยอด
+                </button>
+            </div>
+
+            <!-- Single Fresh Coffee Card -->
+            <div class="bg-gradient-to-b from-stone-900 to-amber-950 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden border border-stone-800 text-center">
+                
+                <!-- Price Badge -->
+                <div class="absolute top-4 right-4 bg-amber-500 text-stone-900 font-black text-lg px-3.5 py-1 rounded-full shadow-lg">
+                    10.-
+                </div>
+
+                <div class="my-4 inline-block relative">
+                    <div class="w-28 h-28 mx-auto rounded-full bg-amber-600/20 flex items-center justify-center border-4 border-amber-500/30 text-amber-400 text-6xl shadow-inner pulse-light">
+                        <i class="fa-solid fa-mug-hot"></i>
+                    </div>
+                </div>
+
+                <h2 class="text-2xl font-extrabold text-amber-100 tracking-wide">กาแฟสดคั่วบดใหม่</h2>
+                <p class="text-xs text-stone-300 mt-1 max-w-xs mx-auto">เข้มข้น หอม กลมกล่อม ชงสดใหม่ทุกแก้วด้วยเมล็ดกาแฟคุณภาพ</p>
+
+                <div class="mt-6 pt-5 border-t border-white/10 space-y-3">
+                    <p class="text-xs font-semibold text-amber-200/80 uppercase tracking-wider mb-2">เลือกวิธีการชำระเงิน (10 บาท)</p>
+                    
+                    <!-- Payment Action 1: QR Transfer -->
+                    <button onclick="handleOrder('qr')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2.5 text-base active:scale-[0.98]">
+                        <i class="fa-solid fa-qrcode text-lg"></i>
+                        <span>เงินโอน (สแกน QR Code)</span>
+                    </button>
+
+                    <!-- Payment Action 2: Put on Tab (Pay Later) -->
+                    <button onclick="handleOrder('debt')" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2.5 text-base active:scale-[0.98]">
+                        <i class="fa-solid fa-file-pen text-lg"></i>
+                        <span>ติดไว้ก่อน (บันทึกยอดชำระ)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Office Activity / History -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200">
+                <h3 class="font-bold text-stone-800 text-xs uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-clock-rotate-left mr-1.5 text-amber-700"></i>ประวัติการกดล่าสุด</span>
+                    <span class="text-[10px] text-stone-400 font-normal">อัปเดตเรียลไทม์</span>
+                </h3>
+                <div id="recent-logs" class="space-y-2 max-h-48 overflow-y-auto text-xs divide-y divide-stone-100">
+                    <!-- Dynamic Logs -->
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: DASHBOARD & ANALYTICS INTERFACE -->
+        <div id="view-dashboard" class="hidden space-y-4">
+            
+            <!-- Dashboard Key Metrics Grid -->
+            <div class="grid grid-cols-2 gap-2.5">
+                <div class="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-sm flex flex-col justify-between">
+                    <span class="text-[11px] font-medium text-stone-500 flex items-center gap-1.5">
+                        <i class="fa-solid fa-sack-dollar text-emerald-600"></i> ยอดขายรวม
+                    </span>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span id="dash-total-revenue" class="text-xl font-black text-stone-800">0</span>
+                        <span class="text-xs text-stone-400">บาท</span>
+                    </div>
+                </div>
+
+                <div class="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-sm flex flex-col justify-between">
+                    <span class="text-[11px] font-medium text-stone-500 flex items-center gap-1.5">
+                        <i class="fa-solid fa-mug-hot text-amber-600"></i> จำนวนกาแฟรวม
+                    </span>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span id="dash-total-cups" class="text-xl font-black text-stone-800">0</span>
+                        <span class="text-xs text-stone-400">แก้ว</span>
+                    </div>
+                </div>
+
+                <div class="bg-red-50 p-3.5 rounded-2xl border border-red-200 shadow-sm flex flex-col justify-between">
+                    <span class="text-[11px] font-medium text-red-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-receipt text-red-600"></i> ค้างชำระ (ติดไว้)
+                    </span>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span id="dash-total-debt" class="text-xl font-black text-red-700">0</span>
+                        <span class="text-xs text-red-500">บาท</span>
+                    </div>
+                </div>
+
+                <div class="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200 shadow-sm flex flex-col justify-between">
+                    <span class="text-[11px] font-medium text-emerald-800 flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-check text-emerald-600"></i> ชำระแล้ว
+                    </span>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span id="dash-total-paid" class="text-xl font-black text-emerald-800">0</span>
+                        <span class="text-xs text-emerald-600">บาท</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Breakdown Chart & Stats -->
+            <div class="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm">
+                <h3 class="font-bold text-xs text-stone-700 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-chart-pie text-amber-600 mr-1.5"></i> สัดส่วนการชำระเงิน</span>
+                </h3>
+                <div class="flex items-center justify-center h-44">
+                    <canvas id="paymentChart"></canvas>
+                </div>
+            </div>
+
+            <!-- User Leaderboard / Rankings -->
+            <div class="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm">
+                <h3 class="font-bold text-xs text-stone-700 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-trophy text-amber-500 mr-1.5"></i> อันดับนักดื่มกาแฟประจำออฟฟิศ</span>
+                    <span class="text-[10px] text-stone-400">เรียงตามจำนวนแก้ว</span>
+                </h3>
+                <div id="dash-leaderboard" class="space-y-2 max-h-52 overflow-y-auto text-xs divide-y divide-stone-100">
+                    <!-- Dynamic Leaderboard -->
+                </div>
+            </div>
+
+            <!-- Department Summary Table -->
+            <div class="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm">
+                <h3 class="font-bold text-xs text-stone-700 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-sitemap text-amber-700 mr-1.5"></i> สรุปการใช้บริการตามแผนก</span>
+                </h3>
+                <div id="dash-dept-summary" class="space-y-2 text-xs">
+                    <!-- Dynamic Dept Stats -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- PROMPTPAY QR MODAL -->
+    <div id="qr-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl text-center relative">
+            <button onclick="closeModal('qr-modal')" class="absolute top-4 right-4 w-7 h-7 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 flex items-center justify-center">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+
+            <!-- PromptPay Header -->
+            <div class="bg-promptpay-blue text-white py-2.5 px-4 rounded-xl flex justify-center items-center gap-2 mb-3">
+                <span class="font-bold tracking-wider text-base">Prompt Pay</span>
+                <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded">พร้อมเพย์ 10 บาท</span>
+            </div>
+
+            <p class="text-xs text-stone-500">สแกนจ่ายเงินโอนเพื่อเริ่มชงกาแฟสด</p>
+            
+            <!-- QR Code -->
+            <div class="my-3 inline-block p-2 border-2 border-stone-200 rounded-2xl bg-white shadow-inner">
+                <img id="qr-image" src="" alt="PromptPay QR Code" class="w-44 h-44 object-contain mx-auto">
+            </div>
+
+            <div class="bg-amber-50 p-2.5 rounded-xl border border-amber-200 mb-3 text-xs text-amber-900 font-medium flex justify-between items-center">
+                <span>ยอดโอน: <strong class="text-amber-800 text-sm">10.00 บาท</strong></span>
+                <span id="display-promptpay-id" class="text-[10px] bg-amber-200/60 text-amber-900 px-2 py-0.5 rounded">พร้อมเพย์</span>
+            </div>
+
+            <!-- Download QR Button -->
+            <button onclick="downloadQRCode('qr-image', 'promptpay-coffee-10baht.png')" class="w-full mb-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium py-2 rounded-xl text-xs transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-download"></i> ดาวน์โหลด QR Code
+            </button>
+
+            <button onclick="confirmOrderSuccess('qr')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow transition text-xs flex items-center justify-center gap-2">
+                <i class="fa-solid fa-circle-check text-sm"></i> สแกนจ่ายเรียบร้อยแล้ว
+            </button>
+        </div>
+    </div>
+
+    <!-- SETTLE DEBT MODAL -->
+    <div id="settle-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl text-center relative max-h-[90vh] flex flex-col">
+            <button onclick="closeModal('settle-modal')" class="absolute top-4 right-4 w-7 h-7 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 flex items-center justify-center">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+
+            <h3 class="font-bold text-stone-800 text-base mb-1">เคลียร์ยอดติดไว้ก่อน</h3>
+            <p class="text-xs text-stone-500 mb-3">เลือกรายการที่ต้องการชำระเงินในครั้งนี้</p>
+
+            <!-- Select All Header Bar -->
+            <div class="flex justify-between items-center bg-stone-100 px-3 py-2 rounded-xl text-xs mb-2 text-stone-700">
+                <label class="flex items-center gap-2 cursor-pointer font-semibold">
+                    <input type="checkbox" id="select-all-debts" onchange="toggleSelectAllDebts(this)" class="w-4 h-4 rounded text-amber-600 focus:ring-amber-500">
+                    <span>เลือกทั้งหมด</span>
+                </label>
+                <span id="settle-selected-count" class="text-[11px] text-stone-500">เลือก 0 รายการ</span>
+            </div>
+
+            <!-- Individual Unpaid Items List -->
+            <div id="settle-items-list" class="space-y-2 overflow-y-auto max-h-40 my-1 pr-1 text-left divide-y divide-stone-100 border border-stone-200 rounded-xl p-2">
+                <!-- Dynamic Debt Items -->
+            </div>
+
+            <!-- Amount & QR Code Container -->
+            <div class="mt-3 bg-amber-50 p-3 rounded-2xl border border-amber-200 text-center">
+                <span class="text-xs text-stone-600 block">ยอดรวมที่เลือกชำระ</span>
+                <span id="settle-amount" class="text-2xl font-extrabold text-amber-900">0 บาท</span>
+                
+                <div id="settle-qr-container" class="mt-2 inline-block p-1.5 border-2 border-stone-200 rounded-xl bg-white shadow-inner">
+                    <img id="settle-qr-image" src="" alt="Settle Debt QR Code" class="w-32 h-32 object-contain mx-auto">
+                </div>
+
+                <div class="mt-2">
+                    <button onclick="downloadQRCode('settle-qr-image', 'promptpay-settle-debt.png')" class="w-full bg-white hover:bg-stone-100 border border-amber-300 text-amber-900 font-medium py-1.5 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-download text-amber-700"></i> ดาวน์โหลด QR Code ยอดนี้
+                    </button>
+                </div>
+            </div>
+
+            <button id="btn-confirm-settle" onclick="confirmSettleDebt()" class="w-full mt-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow transition text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <i class="fa-solid fa-check-double"></i> <span id="btn-confirm-settle-text">ยืนยันชำระรายการที่เลือก</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- PROMPTPAY SETTINGS MODAL -->
+    <div id="promptpay-config-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl text-center relative">
+            <button onclick="closeModal('promptpay-config-modal')" class="absolute top-4 right-4 w-7 h-7 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 flex items-center justify-center">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+
+            <h3 class="font-bold text-stone-800 text-base mb-1 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-qrcode text-promptpay-blue"></i> ตั้งค่า PromptPay รับเงิน (Admin)
+            </h3>
+            <p class="text-xs text-stone-500 mb-4">ใส่เบอร์โทรศัพท์ หรือเลขประจำตัวผู้เสียภาษี/บัตรประชาชน เพื่อสร้าง QR Code พร้อมเพย์จริง</p>
+
+            <div class="space-y-3 text-left">
+                <div>
+                    <label class="block text-xs font-bold text-stone-600 mb-1">หมายเลข พร้อมเพย์ (PromptPay ID)</label>
+                    <input type="text" id="input-promptpay-id" placeholder="เช่น 0812345678 หรือ 1100123456789" class="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
+                    <p class="text-[10px] text-stone-400 mt-1">* รองรับเบอร์โทรศัพท์ (10 หลัก) หรือ เลขบัตรประชาชน/ผู้เสียภาษี (13 หลัก)</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-stone-600 mb-1">เปลี่ยนรหัส PIN Admin</label>
+                    <input type="password" id="input-admin-new-pin" placeholder="รหัส PIN ใหม่ (4-6 หลัก)" class="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
+                </div>
+
+                <button onclick="savePromptPayConfig()" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                    บันทึกข้อมูลตั้งค่า
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN PIN VERIFICATION MODAL -->
+    <div id="admin-pin-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-xs w-full p-5 shadow-2xl text-center relative">
+            <button onclick="closeModal('admin-pin-modal')" class="absolute top-4 right-4 w-7 h-7 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 flex items-center justify-center">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+            <div class="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h3 class="font-bold text-stone-800 text-base mb-1">ยืนยันสิทธิ์ Admin</h3>
+            <p class="text-xs text-stone-500 mb-4">กรุณากรอกรหัส PIN สำหรับผู้ดูแลระบบ<br><span class="text-[10px] text-amber-600 font-semibold">(รหัสเริ่มต้น: 1234)</span></p>
+            <form onsubmit="verifyAdminPin(event)">
+                <input type="password" id="input-admin-pin" placeholder="PIN 4 หลัก" maxlength="6" required class="w-full text-center tracking-widest text-lg px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none mb-3 font-bold">
+                <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                    ยืนยันเข้าสู่ระบบ Admin
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- USER SELECTION / REGISTRATION MODAL -->
+    <div id="user-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] flex flex-col">
+            <button onclick="closeModal('user-modal')" class="absolute top-4 right-4 w-7 h-7 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 flex items-center justify-center">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+
+            <h3 class="font-bold text-stone-800 text-base mb-1 text-center">สลับ / เพิ่มผู้ใช้</h3>
+            <p class="text-xs text-stone-500 mb-3 text-center">เลือกชื่อพนักงานเพื่อทำรายการกดกาแฟสด</p>
+
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-stone-700 mb-1.5">เลือกระบุผู้ใช้ปัจจุบัน</label>
+                <div id="user-list-container" class="space-y-1.5 max-h-40 overflow-y-auto border border-stone-200 rounded-xl p-2">
+                    <!-- Dynamic User List -->
+                </div>
+            </div>
+
+            <div class="border-t border-stone-200 pt-3">
+                <h4 class="font-bold text-xs text-stone-700 mb-2">+ เพิ่มผู้ใช้ใหม่</h4>
+                <form onsubmit="registerUser(event)" class="space-y-2">
+                    <input type="text" id="reg-name" placeholder="ชื่อ-นามสกุล หรือ ชื่อเล่น" required class="w-full px-3 py-2 text-xs border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
+                    <input type="text" id="reg-dept" placeholder="แผนก (เช่น IT, Marketing, HR)" class="w-full px-3 py-2 text-xs border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none">
+                    <button type="submit" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-2 rounded-xl text-xs transition">
+                        บันทึกผู้ใช้ใหม่
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- DISPENSING / BREWING ANIMATION MODAL -->
+    <div id="dispense-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-stone-900 text-white rounded-3xl max-w-xs w-full p-6 shadow-2xl border border-stone-800 text-center">
+            
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center text-2xl">
+                <i class="fa-solid fa-gear fa-spin"></i>
+            </div>
+
+            <h3 class="text-lg font-bold text-amber-100">กำลังบดและชงกาแฟสด...</h3>
+            <p class="text-xs text-stone-400 mt-1 mb-4">กรุณาวางแก้วบริเวณช่องรับเครื่องดื่ม</p>
+
+            <div class="w-full bg-stone-800 rounded-full h-2 overflow-hidden mb-4 border border-stone-700">
+                <div id="dispense-progress" class="bg-amber-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+
+            <p id="dispense-status-text" class="text-xs text-amber-300 font-medium">กำลังสกัดน้ำกาแฟสด (10.-)</p>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-stone-900 text-white px-4 py-2.5 rounded-xl shadow-2xl z-50 hidden flex items-center gap-2 border border-stone-700 text-xs">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+        <span id="toast-msg">ทำรายการสำเร็จ</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-stone-900 text-stone-500 py-4 text-center text-[11px] border-t border-stone-800 mt-6">
+        <p>© Office Fresh Coffee System • กาแฟสดออฟฟิศ 10 บาท</p>
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // LocalStorage keys
+        const STORAGE_USERS = 'office_coffee_users_v3';
+        const STORAGE_CURRENT_USER = 'office_coffee_active_user_v3';
+        const STORAGE_LOGS = 'office_coffee_logs_v3';
+        const STORAGE_DEBTS = 'office_coffee_debts_v3';
+        const STORAGE_PROMPTPAY = 'office_coffee_promptpay_id_v1';
+        const STORAGE_ADMIN_PIN = 'office_coffee_admin_pin_v1';
+        const STORAGE_SB_URL = 'office_coffee_sb_url';
+        const STORAGE_SB_KEY = 'office_coffee_sb_key';
+
+        // State
+        let users = [];
+        let activeUserId = null;
+        let logs = [];
+        let debtItems = [];
+        let promptPayId = '0812345678';
+        let adminPin = '1234';
+        let pendingAdminAction = null;
+        
+        // Supabase State
+        let supabaseUrl = ''; 
+        let supabaseKey = ''; 
+        let supabaseClient = null;
+        let isSupabaseActive = false;
+        let paymentChartInstance = null;
+
+        window.onload = function() {
+            initSupabase();
+            loadData();
+            renderUI();
+        };
+
+        function loadData() {
+            try {
+                const u = localStorage.getItem(STORAGE_USERS);
+                if (u) users = JSON.parse(u);
+
+                const curr = localStorage.getItem(STORAGE_CURRENT_USER);
+                if (curr) activeUserId = curr;
+
+                const l = localStorage.getItem(STORAGE_LOGS);
+                if (l) logs = JSON.parse(l);
+
+                const d = localStorage.getItem(STORAGE_DEBTS);
+                if (d) debtItems = JSON.parse(d);
+
+                const pp = localStorage.getItem(STORAGE_PROMPTPAY);
+                if (pp) promptPayId = pp;
+
+                const pin = localStorage.getItem(STORAGE_ADMIN_PIN);
+                if (pin) adminPin = pin;
+            } catch(e) {
+                console.error("Error loading local data", e);
+            }
+
+            // Ensure Admin user and default users exist
+            if (users.length === 0) {
+                users = [
+                    { id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true },
+                    { id: 'u1', name: 'คุณสมชาย (IT)', dept: 'IT', debt: 0, totalCups: 0, isAdmin: false },
+                    { id: 'u2', name: 'คุณอนันต์ (HR)', dept: 'HR', debt: 0, totalCups: 0, isAdmin: false }
+                ];
+                saveData();
+            } else {
+                // Ensure at least one admin exists
+                const hasAdmin = users.some(u => u.isAdmin);
+                if (!hasAdmin) {
+                    users.unshift({ id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true });
+                    saveData();
+                }
+            }
+
+            if (!activeUserId && users.length > 0) {
+                activeUserId = users[1] ? users[1].id : users[0].id;
+            }
+
+            if (isSupabaseActive) {
+                fetchFromSupabase();
+            }
+        }
+
+        function renderUI() {
+            const currentUser = users.find(u => u.id === activeUserId) || users[0];
+            if (!currentUser) return;
+
+            // Header elements
+            document.getElementById('header-user-name').innerText = currentUser.name;
+            document.getElementById('current-user-name').innerText = currentUser.name;
+            document.getElementById('user-dept-badge').innerText = currentUser.dept || 'ทั่วไป';
+
+            // Show/Hide Admin Settings Button
+            const btnSettings = document.getElementById('btn-settings');
+            if (btnSettings) {
+                if (currentUser.isAdmin) {
+                    btnSettings.classList.remove('hidden');
+                } else {
+                    btnSettings.classList.add('hidden');
+                }
+            }
+
+            // Calculate user debt
+            const userDebt = calculateUserDebt(currentUser.id);
+            document.getElementById('current-user-debt').innerText = `${userDebt} บาท`;
+
+            const btnPayDebt = document.getElementById('btn-pay-debt');
+            if (userDebt > 0) {
+                btnPayDebt.classList.remove('hidden');
+            } else {
+                btnPayDebt.classList.add('hidden');
+            }
+
+            renderLogs();
+            renderUserModalList();
+        }
+
+        function calculateUserDebt(userId) {
+            return debtItems
+                .filter(d => d.userId === userId && !d.paid)
+                .reduce((sum, d) => sum + d.amount, 0);
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('recent-logs');
+            container.innerHTML = '';
+
+            if (logs.length === 0) {
+                container.innerHTML = `<div class="text-center py-3 text-stone-400">ยังไม่มีประวัติการสั่งซื้อ</div>`;
+                return;
+            }
+
+            logs.slice(0, 10).forEach(log => {
+                const isQr = log.method === 'qr';
+                const div = document.createElement('div');
+                div.className = "py-2 flex items-center justify-between text-stone-700";
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full ${isQr ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
+                        <div>
+                            <span class="font-medium text-stone-800">${log.userName}</span>
+                            <span class="text-[10px] text-stone-400 block">${log.time}</span>
+                        </div>
+                    </div>
+                    <span class="font-bold ${isQr ? 'text-emerald-700' : 'text-amber-800'}">
+                        ${isQr ? 'โอน QR 10.-' : 'ติดไว้ก่อน 10.-'}
+                    </span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderUserModalList() {
+            const container = document.getElementById('user-list-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            users.forEach(u => {
+                const isActive = u.id === activeUserId;
+                const userDebt = calculateUserDebt(u.id);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => selectUser(u.id);
+                btn.className = `w-full text-left p-2 rounded-xl flex items-center justify-between transition text-xs ${
+                    isActive ? 'bg-amber-100 border border-amber-300 font-bold text-amber-900' : 'bg-stone-50 hover:bg-stone-100 text-stone-700'
+                }`;
+                btn.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid ${u.isAdmin ? 'fa-user-shield text-amber-600' : 'fa-user text-stone-400'}"></i>
+                        <span>${u.name} ${u.isAdmin ? '<span class="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded ml-1">Admin</span>' : ''}</span>
+                    </div>
+                    <span class="${userDebt > 0 ? 'text-red-600 font-bold' : 'text-stone-400'}">${userDebt > 0 ? `ค้าง ${userDebt}฿` : 'พร้อมกด'}</span>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        function selectUser(userId) {
+            const targetUser = users.find(u => u.id === userId);
+            if (!targetUser) return;
+
+            // If switching to Admin account, demand Admin PIN
+            if (targetUser.isAdmin && activeUserId !== targetUser.id) {
+                pendingAdminAction = () => {
+                    activeUserId = targetUser.id;
+                    saveData();
+                    renderUI();
+                    closeModal('user-modal');
+                    showToast(`สลับใช้งานเป็น ${targetUser.name} เรียบร้อยแล้ว`);
+                };
+                openAdminPinModal();
+                return;
+            }
+
+            activeUserId = targetUser.id;
+            saveData();
+            renderUI();
+            closeModal('user-modal');
+            showToast(`สลับใช้งานเป็น ${targetUser.name}`);
+        }
+
+        function openAdminPinModal(onSuccessCallback) {
+            if (onSuccessCallback) {
+                pendingAdminAction = onSuccessCallback;
+            }
+            document.getElementById('input-admin-pin').value = '';
+            document.getElementById('admin-pin-modal').classList.remove('hidden');
+        }
+
+        function verifyAdminPin(e) {
+            e.preventDefault();
+            const inputPin = document.getElementById('input-admin-pin').value;
+            if (inputPin === adminPin) {
+                closeModal('admin-pin-modal');
+                if (pendingAdminAction) {
+                    const action = pendingAdminAction;
+                    pendingAdminAction = null;
+                    action();
+                }
+            } else {
+                showToast('รหัส PIN Admin ไม่ถูกต้อง!');
+            }
+        }
+
+        function openPromptPayConfigModal() {
+            const currentUser = users.find(u => u.id === activeUserId);
+            if (!currentUser || !currentUser.isAdmin) {
+                openAdminPinModal(() => {
+                    document.getElementById('input-promptpay-id').value = promptPayId;
+                    document.getElementById('promptpay-config-modal').classList.remove('hidden');
+                });
+                return;
+            }
+            document.getElementById('input-promptpay-id').value = promptPayId;
+            document.getElementById('promptpay-config-modal').classList.remove('hidden');
+        }
+
+        function savePromptPayConfig() {
+            const inputPP = document.getElementById('input-promptpay-id').value.trim();
+            const newPin = document.getElementById('input-admin-new-pin').value.trim();
+
+            if (inputPP) {
+                promptPayId = inputPP;
+                localStorage.setItem(STORAGE_PROMPTPAY, promptPayId);
+            }
+
+            if (newPin && newPin.length >= 4) {
+                adminPin = newPin;
+                localStorage.setItem(STORAGE_ADMIN_PIN, adminPin);
+                showToast('อัปเดตรหัส PIN Admin เรียบร้อย');
+            }
+
+            closeModal('promptpay-config-modal');
+            showToast('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+            renderUI();
+        }
+
+        function openUserModal() {
+            renderUserModalList();
+            document.getElementById('user-modal').classList.remove('hidden');
+        }
+
+        /* Order Handling & Modals */
+        function handleOrder(method) {
+            const currentUser = users.find(u => u.id === activeUserId);
+            if (!currentUser) {
+                openUserModal();
+                return;
+            }
+
+            if (method === 'qr') {
+                const qrUrl = generatePromptPayQR(promptPayId, 10);
+                document.getElementById('qr-image').src = qrUrl;
+                document.getElementById('display-promptpay-id').innerText = promptPayId;
+                document.getElementById('qr-modal').classList.remove('hidden');
+            } else if (method === 'debt') {
+                confirmOrderSuccess('debt');
+            }
+        }
+
+        function startDispensingAnimation() {
+            const dispenseModal = document.getElementById('dispense-modal');
+            const progressBar = document.getElementById('dispense-progress');
+            const statusText = document.getElementById('dispense-status-text');
+
+            dispenseModal.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            statusText.innerText = 'กำลังเริ่มบดเมล็ดกาแฟสด...';
+
+            setTimeout(() => {
+                progressBar.style.width = '40%';
+                statusText.innerText = 'กำลังทำความร้อนและสกัดกาแฟ...';
+            }, 1000);
+
+            setTimeout(() => {
+                progressBar.style.width = '80%';
+                statusText.innerText = 'กำลังเทกาแฟลงในแก้ว...';
+            }, 2300);
+
+            setTimeout(() => {
+                progressBar.style.width = '100%';
+                statusText.innerText = 'เสร็จเรียบร้อย! เชิญรับกาแฟสดได้เลยครับ';
+            }, 3500);
+
+            setTimeout(() => {
+                dispenseModal.classList.add('hidden');
+                showToast('ชงกาแฟสดเสร็จสิ้น ขอให้มีความสุขกับการทำงานครับ! ☕');
+            }, 4300);
+        }
+
+        /* Settle Debt Logic */
+        function openSettleDebtModal() {
+            const currentUser = users.find(u => u.id === activeUserId);
+            if (!currentUser) return;
+
+            const userUnpaidDebts = debtItems.filter(d => d.userId === currentUser.id && !d.paid);
+            const listContainer = document.getElementById('settle-items-list');
+            listContainer.innerHTML = '';
+
+            if (userUnpaidDebts.length === 0) {
+                listContainer.innerHTML = `<p class="text-xs text-stone-400 text-center py-4">ไม่มีรายการติดค้างชำระ</p>`;
+                document.getElementById('settle-amount').innerText = '0 บาท';
+                document.getElementById('btn-confirm-settle').disabled = true;
+                document.getElementById('settle-modal').classList.remove('hidden');
+                return;
+            }
+
+            userUnpaidDebts.forEach((debt, idx) => {
+                const div = document.createElement('div');
+                div.className = "py-2 px-1 flex items-center justify-between text-xs";
+                div.innerHTML = `
+                    <label class="flex items-center gap-2.5 cursor-pointer flex-1">
+                        <input type="checkbox" value="${debt.id}" onchange="updateSettleTotal()" class="debt-item-checkbox w-4 h-4 rounded text-amber-600 focus:ring-amber-500">
+                        <div>
+                            <span class="font-bold text-stone-800">กาแฟสด 10.-</span>
+                            <span class="text-[10px] text-stone-400 block">${debt.timeStr}</span>
+                        </div>
+                    </label>
+                    <span class="font-bold text-amber-900">10 บาท</span>
+                `;
+                listContainer.appendChild(div);
+            });
+
+            document.getElementById('select-all-debts').checked = false;
+            updateSettleTotal();
+            document.getElementById('settle-modal').classList.remove('hidden');
+        }
+
+        function toggleSelectAllDebts(masterCheckbox) {
+            const checkboxes = document.querySelectorAll('.debt-item-checkbox');
+            checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
+            updateSettleTotal();
+        }
+
+        function updateSettleTotal() {
+            const checkboxes = document.querySelectorAll('.debt-item-checkbox:checked');
+            const totalAmount = checkboxes.length * 10;
+
+            document.getElementById('settle-selected-count').innerText = `เลือก ${checkboxes.length} รายการ`;
+            document.getElementById('settle-amount').innerText = `${totalAmount} บาท`;
+
+            const btnConfirm = document.getElementById('btn-confirm-settle');
+            const qrContainer = document.getElementById('settle-qr-container');
+
+            if (totalAmount > 0) {
+                btnConfirm.disabled = false;
+                qrContainer.classList.remove('hidden');
+                const qrUrl = generatePromptPayQR(promptPayId, totalAmount);
+                document.getElementById('settle-qr-image').src = qrUrl;
+            } else {
+                btnConfirm.disabled = true;
+                qrContainer.classList.add('hidden');
+            }
+        }
+
+        /* Download QR Code Utility */
+        function downloadQRCode(imgElementId, fileName) {
+            const imgEl = document.getElementById(imgElementId);
+            if (!imgEl || !imgEl.src) return;
+
+            const a = document.createElement('a');
+            a.href = imgEl.src;
+            a.download = fileName || 'promptpay-qr.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('ดาวน์โหลด QR Code เรียบร้อยแล้ว');
+        }
+
+        /* Generate Native PromptPay Payload & QR Code (EMVCo Standard) */
+        function generatePromptPayQR(target, amount) {
+            let sanitized = target.replace(/[^0-9]/g, '');
+            let targetType = '01'; // Default: Mobile Number
+
+            if (sanitized.length === 10) {
+                // Phone number -> Format to 00668xxxxxxxx
+                sanitized = '0066' + sanitized.substring(1);
+                targetType = '01';
+            } else if (sanitized.length === 13) {
+                // National ID / Tax ID
+                targetType = '02';
+            }
+
+            // Construct EMVCo Payload
+            const f00 = '000201'; // Payload Format Indicator
+            const f01 = '010211'; // Point of Initiation Method (11: Static, 12: Dynamic)
+            
+            // Merchant Information Language Template (PromptPay ID)
+            const ppTargetTag = targetType + padLeft(sanitized.length.toString(), 2) + sanitized;
+            const ppAppId = '0016A000000677010111'; // PromptPay AID
+            const merchantInfoContent = ppAppId + ppTargetTag;
+            const f29 = '29' + padLeft(merchantInfoContent.length.toString(), 2) + merchantInfoContent;
+
+            const f53 = '5303764'; // Transaction Currency (764 = THB)
+            
+            let f54 = '';
+            if (amount && amount > 0) {
+                const amtStr = parseFloat(amount).toFixed(2);
+                f54 = '54' + padLeft(amtStr.length.toString(), 2) + amtStr;
+            }
+
+            const f58 = '5802TH'; // Country Code (TH)
+            const f63 = '6304'; // CRC Header
+
+            const rawPayload = f00 + f01 + f29 + f53 + f54 + f58 + f63;
+            const crc = crc16Hex(rawPayload);
+            const fullPayload = rawPayload + crc;
+
+            return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(fullPayload)}`;
+        }
+
+        function padLeft(str, len) {
+            while (str.length < len) str = '0' + str;
+            return str;
+        }
+
+        function crc16Hex(str) {
+            let crc = 0xFFFF;
+            for (let i = 0; i < str.length; i++) {
+                crc ^= str.charCodeAt(i) << 8;
+                for (let j = 0; j < 8; j++) {
+                    if ((crc & 0x8000) !== 0) {
+                        crc = (crc << 1) ^ 0x1021;
+                    } else {
+                        crc = crc << 1;
+                    }
+                    crc = crc & 0xFFFF;
+                }
+            }
+            return padLeft(crc.toString(16).toUpperCase(), 4);
+        }
+    </script>
+</body>
+</html>
