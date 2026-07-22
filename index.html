@@ -825,6 +825,32 @@
             renderUI();
             switchTab('kiosk');
             showToast(`สมัครสมาชิกสำเร็จ: ยินดีต้อนรับ ${name}`);
+
+            // Insert into Supabase DB with Fallback & Error Catching for 401/400
+            if (isSupabaseActive && supabaseClient) {
+                try {
+                    let payload = {
+                        id: newUser.id,
+                        name: newUser.name,
+                        pin: newUser.pin,
+                        dept: newUser.dept,
+                        debt: 0,
+                        total_cups: 0,
+                        is_admin: false
+                    };
+                    const { error } = await supabaseClient.from('users').insert([payload]);
+                    if (error) {
+                        console.warn("Supabase insert with pin failed:", error.message);
+                        delete payload.pin;
+                        const { error: err2 } = await supabaseClient.from('users').insert([payload]);
+                        if (err2) {
+                            console.warn("Supabase insert fallback failed (Check RLS policy in Supabase):", err2.message);
+                        }
+                    }
+                } catch(err) {
+                    console.warn("Supabase insert user caught exception:", err);
+                }
+            }
         }
 
         function promptUserLogin(userId) {
@@ -949,7 +975,7 @@
 
             saveLocalData();
 
-            // Insert to Supabase DB
+            // Insert to Supabase DB safely
             if (isSupabaseActive && supabaseClient) {
                 try {
                     await supabaseClient.from('coffee_logs').insert([{
@@ -975,7 +1001,7 @@
                         }]);
                     }
                 } catch(err) {
-                    console.error("Supabase order sync error", err);
+                    console.warn("Supabase order sync error:", err);
                 }
             }
 
