@@ -587,7 +587,6 @@
                 // 1. Fetch Users directly from Supabase
                 const { data: dbUsers, error: uErr } = await supabaseClient.from('users').select('*').order('created_at', { ascending: true });
                 if (!uErr && dbUsers) {
-                    // Directly replace users array with Supabase DB data
                     users = dbUsers.map(dbU => ({
                         id: dbU.id,
                         name: dbU.name,
@@ -598,7 +597,6 @@
                         isAdmin: dbU.is_admin || false
                     }));
 
-                    // Ensure admin account exists if dbUsers is missing it
                     if (!users.some(u => u.isAdmin)) {
                         users.unshift({ id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true });
                     }
@@ -644,7 +642,6 @@
                             localStorage.setItem(STORAGE_ADMIN_PIN, adminPin);
                         }
                     } else {
-                        // Fallback sync from Admin user record
                         const adminU = users.find(u => u.isAdmin || u.id === 'u_admin');
                         if (adminU && adminU.dept && /^[0-9]{10,13}$/.test(adminU.dept)) {
                             promptPayId = adminU.dept;
@@ -769,7 +766,6 @@
             const inputPin = document.getElementById('input-user-pin').value.trim();
             const userPin = targetUser.pin;
 
-            // ตรวจสอบ PIN: ถ้าเป็น Admin สามารถใช้ adminPin ได้ แต่ถ้าเป็นพนักงานทั่วไป ต้องใช้ PIN ของตัวเองเท่านั้น
             const isValid = targetUser.isAdmin 
                 ? (inputPin === userPin || inputPin === adminPin)
                 : (inputPin === userPin);
@@ -827,7 +823,6 @@
                 isAdmin: false
             };
 
-            // Write to Supabase First
             if (isSupabaseActive && supabaseClient) {
                 try {
                     let userPayload = {
@@ -961,7 +956,6 @@
                 };
             }
 
-            // Write to Supabase DB safely
             if (isSupabaseActive && supabaseClient) {
                 try {
                     let userPayload = {
@@ -1204,7 +1198,41 @@
                         <span class="font-bold text-stone-800">${u.name}</span>
                         <span class="text-[10px] text-stone-400">(${u.dept || 'ทั่วไป'})</span>
                     </div>
-                    ${u.isAdmin ? '<span class="text-[10px] bg-amber-200 text-amber-900 px-1.5 rounded">Admin</span>' : `
+                    ${u.isAdmin ? '<span class="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">Admin</span>' : `
+                        <button onclick="deleteUserByAdmin('${u.id}')" class="text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-lg font-medium text-[10px] transition flex items-center gap-1 border border-red-200">
+                            <i class="fa-solid fa-trash-can"></i> ลบ
+                        </button>
+                    `}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function deleteUserByAdmin(userId) {
+            const targetUser = users.find(u => u.id === userId);
+            if (!targetUser) return;
+            if (targetUser.isAdmin) {
+                showToast('ไม่สามารถลบบัญชี Admin ได้');
+                return;
+            }
+
+            if (isSupabaseActive && supabaseClient) {
+                try {
+                    await supabaseClient.from('users').delete().eq('id', userId);
+                    await fetchFromSupabase();
+                } catch(e) {
+                    console.warn("Supabase user delete error:", e);
+                }
+            } else {
+                users = users.filter(u => u.id !== userId);
+                saveLocalData();
+            }
+
+            renderAdminUserList();
+            renderUI();
+            showToast(`ลบพนักงาน ${targetUser.name} เรียบร้อยแล้ว`);
+        }
+
         async function savePromptPayConfig() {
             const inputPP = document.getElementById('input-promptpay-id').value.trim();
             const newPin = document.getElementById('input-admin-new-pin').value.trim();
@@ -1220,24 +1248,21 @@
                 showToast('อัปเดตรหัส PIN Admin เรียบร้อย');
             }
 
-            // Sync PromptPay ID & PIN to Supabase so all devices update in real-time
             if (isSupabaseActive && supabaseClient) {
                 try {
-                    // Try saving to app_config table
-                    const { error: cfgErr } = await supabaseClient.from('app_config').upsert([{
+                    await supabaseClient.from('app_config').upsert([{
                         id: 'main',
                         promptpay_id: promptPayId,
                         admin_pin: adminPin
                     }]);
 
-                    // Fallback to updating u_admin record in users table
                     const adminUser = users.find(u => u.isAdmin || u.id === 'u_admin');
                     if (adminUser) {
                         let adminPayload = {
                             id: adminUser.id,
                             name: adminUser.name,
                             pin: adminPin,
-                            dept: promptPayId, // store PromptPay ID for multi-device sync
+                            dept: promptPayId,
                             debt: 0,
                             total_cups: adminUser.totalCups || 0,
                             is_admin: true
@@ -1276,7 +1301,6 @@
 
             initOrUpdateChart(totalPaid, unpaidDebts);
 
-            // Render Leaderboard
             const leaderboardContainer = document.getElementById('dash-leaderboard');
             leaderboardContainer.innerHTML = '';
             const sortedUsers = [...users].sort((a, b) => (b.totalCups || 0) - (a.totalCups || 0));
