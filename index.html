@@ -492,10 +492,10 @@
     <!-- JavaScript Application Logic -->
     <script>
         // Storage keys
-        const STORAGE_USERS = 'office_coffee_users_v4';
-        const STORAGE_CURRENT_USER = 'office_coffee_active_user_v4';
-        const STORAGE_LOGS = 'office_coffee_logs_v4';
-        const STORAGE_DEBTS = 'office_coffee_debts_v4';
+        const STORAGE_USERS = 'office_coffee_users_v5';
+        const STORAGE_CURRENT_USER = 'office_coffee_active_user_v5';
+        const STORAGE_LOGS = 'office_coffee_logs_v5';
+        const STORAGE_DEBTS = 'office_coffee_debts_v5';
         const STORAGE_PROMPTPAY = 'office_coffee_promptpay_id_v2';
         const STORAGE_ADMIN_PIN = 'office_coffee_admin_pin_v2';
 
@@ -523,10 +523,10 @@
             loadLocalData();
             renderUI();
             
-            // Auto sync polling every 5 seconds
+            // Auto sync polling every 3 seconds across all devices
             setInterval(() => {
                 if (isSupabaseActive) fetchFromSupabase();
-            }, 5000);
+            }, 3000);
         };
 
         function initSupabase() {
@@ -584,32 +584,27 @@
         async function fetchFromSupabase() {
             if (!isSupabaseActive || !supabaseClient) return;
             try {
-                // Fetch Users
-                const { data: dbUsers, error: uErr } = await supabaseClient.from('users').select('*');
-                if (!uErr && dbUsers && dbUsers.length > 0) {
-                    dbUsers.forEach(dbU => {
-                        const existingIdx = users.findIndex(u => u.id === dbU.id);
-                        if (existingIdx >= 0) {
-                            users[existingIdx].name = dbU.name;
-                            users[existingIdx].dept = dbU.dept;
-                            users[existingIdx].totalCups = dbU.total_cups || 0;
-                            users[existingIdx].isAdmin = dbU.is_admin;
-                            if (dbU.pin) users[existingIdx].pin = dbU.pin;
-                        } else {
-                            users.push({
-                                id: dbU.id,
-                                name: dbU.name,
-                                pin: dbU.pin || '1234',
-                                dept: dbU.dept || 'ทั่วไป',
-                                debt: dbU.debt || 0,
-                                totalCups: dbU.total_cups || 0,
-                                isAdmin: dbU.is_admin || false
-                            });
-                        }
-                    });
+                // 1. Fetch Users directly from Supabase
+                const { data: dbUsers, error: uErr } = await supabaseClient.from('users').select('*').order('created_at', { ascending: true });
+                if (!uErr && dbUsers) {
+                    // Directly replace users array with Supabase DB data
+                    users = dbUsers.map(dbU => ({
+                        id: dbU.id,
+                        name: dbU.name,
+                        pin: dbU.pin || '1234',
+                        dept: dbU.dept || 'ทั่วไป',
+                        debt: dbU.debt || 0,
+                        totalCups: dbU.total_cups || 0,
+                        isAdmin: dbU.is_admin || false
+                    }));
+
+                    // Ensure admin account exists if dbUsers is missing it
+                    if (!users.some(u => u.isAdmin)) {
+                        users.unshift({ id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true });
+                    }
                 }
 
-                // Fetch Logs
+                // 2. Fetch Logs directly from Supabase
                 const { data: dbLogs, error: lErr } = await supabaseClient.from('coffee_logs').select('*').order('created_at', { ascending: false });
                 if (!lErr && dbLogs) {
                     logs = dbLogs.map(l => ({
@@ -623,8 +618,8 @@
                     }));
                 }
 
-                // Fetch Debts
-                const { data: dbDebts, error: dErr } = await supabaseClient.from('debts').select('*');
+                // 3. Fetch Debts directly from Supabase
+                const { data: dbDebts, error: dErr } = await supabaseClient.from('debts').select('*').order('created_at', { ascending: false });
                 if (!dErr && dbDebts) {
                     debtItems = dbDebts.map(d => ({
                         id: d.id,
@@ -784,7 +779,7 @@
             const pin = document.getElementById('reg-pin').value.trim();
 
             if (!name || !pin) {
-                showToast('กรุณากรอกชื่อและรหัส PINให้ครบถ้วน');
+                showToast('กรุณากรอกชื่อและรหัส PIN ให้ครบถ้วน');
                 return;
             }
 
@@ -803,11 +798,7 @@
                 isAdmin: false
             };
 
-            users.push(newUser);
-            activeUserId = newUser.id;
-            saveLocalData();
-
-            // Insert to Supabase with fallback
+            // Write to Supabase First
             if (isSupabaseActive && supabaseClient) {
                 try {
                     let userPayload = {
@@ -821,15 +812,20 @@
                     };
                     let { error } = await supabaseClient.from('users').insert([userPayload]);
                     if (error) {
-                        console.warn("Supabase insert fallback (retrying without pin):", error.message);
+                        console.warn("Supabase insert error fallback:", error.message);
                         delete userPayload.pin;
                         await supabaseClient.from('users').insert([userPayload]);
                     }
+                    await fetchFromSupabase();
                 } catch(err) {
                     console.warn("Supabase sync error on user registration:", err);
                 }
+            } else {
+                users.push(newUser);
+                saveLocalData();
             }
 
+            activeUserId = newUser.id;
             closeModal('register-modal');
             renderUI();
             showToast(`สมัครสมาชิกสำเร็จ! ยินดีต้อนรับ ${name}`);
@@ -922,7 +918,6 @@
                 time: nowStr
             };
 
-            logs.unshift(newLog);
             currentUser.totalCups = (currentUser.totalCups || 0) + cupsCount;
 
             let newDebt = null;
@@ -935,12 +930,9 @@
                     paid: false,
                     timeStr: nowStr
                 };
-                debtItems.push(newDebt);
             }
 
-            saveLocalData();
-
-            // Insert to Supabase DB safely
+            // Write to Supabase DB safely
             if (isSupabaseActive && supabaseClient) {
                 try {
                     let userPayload = {
@@ -974,8 +966,6 @@
                         await supabaseClient.from('coffee_logs').insert([logPayload]);
                     }
 
-                    await supabaseClient.from('users').update({ total_cups: currentUser.totalCups }).eq('id', currentUser.id);
-
                     if (newDebt) {
                         let debtPayload = {
                             id: newDebt.id,
@@ -991,9 +981,15 @@
                             await supabaseClient.from('debts').insert([debtPayload]);
                         }
                     }
+
+                    await fetchFromSupabase();
                 } catch(err) {
                     console.warn("Supabase order sync error:", err);
                 }
+            } else {
+                logs.unshift(newLog);
+                if (newDebt) debtItems.push(newDebt);
+                saveLocalData();
             }
 
             closeModal('qr-modal');
@@ -1107,22 +1103,22 @@
 
             if (selectedIds.length === 0) return;
 
-            debtItems.forEach(d => {
-                if (selectedIds.includes(d.id)) {
-                    d.paid = true;
-                }
-            });
-
-            saveLocalData();
-
             if (isSupabaseActive && supabaseClient) {
                 try {
                     for (let id of selectedIds) {
                         await supabaseClient.from('debts').update({ paid: true }).eq('id', id);
                     }
+                    await fetchFromSupabase();
                 } catch(e) {
                     console.warn("Supabase debt settle sync error:", e);
                 }
+            } else {
+                debtItems.forEach(d => {
+                    if (selectedIds.includes(d.id)) {
+                        d.paid = true;
+                    }
+                });
+                saveLocalData();
             }
 
             closeModal('settle-modal');
@@ -1194,16 +1190,17 @@
             if (!userToDelete) return;
 
             if (confirm(`คุณต้องการลบสมาชิก "${userToDelete.name}" ออกจากระบบใช่หรือไม่?`)) {
-                users = users.filter(u => u.id !== userId);
-                if (activeUserId === userId) activeUserId = null;
-                saveLocalData();
-
                 if (isSupabaseActive && supabaseClient) {
                     try {
                         await supabaseClient.from('users').delete().eq('id', userId);
+                        await fetchFromSupabase();
                     } catch(e) {
                         console.warn("Supabase user delete error:", e);
                     }
+                } else {
+                    users = users.filter(u => u.id !== userId);
+                    if (activeUserId === userId) activeUserId = null;
+                    saveLocalData();
                 }
 
                 renderAdminUserList();
