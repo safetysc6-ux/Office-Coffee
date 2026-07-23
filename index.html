@@ -587,15 +587,19 @@
                 // 1. Fetch Users directly from Supabase
                 const { data: dbUsers, error: uErr } = await supabaseClient.from('users').select('*').order('created_at', { ascending: true });
                 if (!uErr && dbUsers) {
-                    users = dbUsers.map(dbU => ({
+                    const fetchedUsers = dbUsers.map(dbU => ({
                         id: dbU.id,
                         name: dbU.name,
-                        pin: dbU.pin,
+                        pin: dbU.pin || '1234',
                         dept: dbU.dept || 'ทั่วไป',
                         debt: dbU.debt || 0,
                         totalCups: dbU.total_cups || 0,
                         isAdmin: dbU.is_admin || false
                     }));
+
+                    // Keep local unsynced users to prevent UI erasure
+                    const unSyncedUsers = users.filter(lu => !fetchedUsers.some(fu => fu.id === lu.id));
+                    users = [...fetchedUsers, ...unSyncedUsers];
 
                     if (!users.some(u => u.isAdmin)) {
                         users.unshift({ id: 'u_admin', name: 'ผู้ดูแลระบบ (Admin)', pin: '1234', dept: 'Management', debt: 0, totalCups: 0, isAdmin: true });
@@ -640,12 +644,6 @@
                         if (dbConfig[0].admin_pin) {
                             adminPin = dbConfig[0].admin_pin;
                             localStorage.setItem(STORAGE_ADMIN_PIN, adminPin);
-                        }
-                    } else {
-                        const adminU = users.find(u => u.isAdmin || u.id === 'u_admin');
-                        if (adminU && adminU.dept && /^[0-9]{10,13}$/.test(adminU.dept)) {
-                            promptPayId = adminU.dept;
-                            localStorage.setItem(STORAGE_PROMPTPAY, promptPayId);
                         }
                     }
                 } catch(cErr) {
@@ -823,6 +821,12 @@
                 isAdmin: false
             };
 
+            // 1. Local first save
+            users.push(newUser);
+            activeUserId = newUser.id;
+            saveLocalData();
+
+            // 2. Cloud sync
             if (isSupabaseActive && supabaseClient) {
                 try {
                     let userPayload = {
@@ -836,20 +840,16 @@
                     };
                     let { error } = await supabaseClient.from('users').insert([userPayload]);
                     if (error) {
-                        console.warn("Supabase insert error fallback:", error.message);
+                        console.warn("Supabase insert notice:", error.message);
                         delete userPayload.pin;
                         await supabaseClient.from('users').insert([userPayload]);
                     }
                     await fetchFromSupabase();
                 } catch(err) {
-                    console.warn("Supabase sync error on user registration:", err);
+                    console.warn("Supabase sync notice on user registration:", err);
                 }
-            } else {
-                users.push(newUser);
-                saveLocalData();
             }
 
-            activeUserId = newUser.id;
             closeModal('register-modal');
             renderUI();
             showToast(`สมัครสมาชิกสำเร็จ! ยินดีต้อนรับ ${name}`);
@@ -956,6 +956,12 @@
                 };
             }
 
+            // Local First
+            logs.unshift(newLog);
+            if (newDebt) debtItems.push(newDebt);
+            saveLocalData();
+
+            // Cloud sync
             if (isSupabaseActive && supabaseClient) {
                 try {
                     let userPayload = {
@@ -1007,12 +1013,8 @@
 
                     await fetchFromSupabase();
                 } catch(err) {
-                    console.warn("Supabase order sync error:", err);
+                    console.warn("Supabase order sync notice:", err);
                 }
-            } else {
-                logs.unshift(newLog);
-                if (newDebt) debtItems.push(newDebt);
-                saveLocalData();
             }
 
             closeModal('qr-modal');
@@ -1126,6 +1128,15 @@
 
             if (selectedIds.length === 0) return;
 
+            // Local First
+            debtItems.forEach(d => {
+                if (selectedIds.includes(d.id)) {
+                    d.paid = true;
+                }
+            });
+            saveLocalData();
+
+            // Cloud Sync
             if (isSupabaseActive && supabaseClient) {
                 try {
                     for (let id of selectedIds) {
@@ -1133,15 +1144,8 @@
                     }
                     await fetchFromSupabase();
                 } catch(e) {
-                    console.warn("Supabase debt settle sync error:", e);
+                    console.warn("Supabase debt settle sync notice:", e);
                 }
-            } else {
-                debtItems.forEach(d => {
-                    if (selectedIds.includes(d.id)) {
-                        d.paid = true;
-                    }
-                });
-                saveLocalData();
             }
 
             closeModal('settle-modal');
@@ -1216,16 +1220,18 @@
                 return;
             }
 
+            // Local First
+            users = users.filter(u => u.id !== userId);
+            saveLocalData();
+
+            // Cloud Sync
             if (isSupabaseActive && supabaseClient) {
                 try {
                     await supabaseClient.from('users').delete().eq('id', userId);
                     await fetchFromSupabase();
                 } catch(e) {
-                    console.warn("Supabase user delete error:", e);
+                    console.warn("Supabase user delete notice:", e);
                 }
-            } else {
-                users = users.filter(u => u.id !== userId);
-                saveLocalData();
             }
 
             renderAdminUserList();
@@ -1274,7 +1280,7 @@
                         }
                     }
                 } catch(e) {
-                    console.warn("Supabase PromptPay config sync error:", e);
+                    console.warn("Supabase PromptPay config sync notice:", e);
                 }
             }
 
@@ -1433,3 +1439,4 @@
     </script>
 </body>
 </html>
+```
